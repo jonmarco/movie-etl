@@ -1,0 +1,28 @@
+# config.yaml
+
+bronze_path: "data/bronze/"
+silver_path: "data/silver/"
+gold_path: "data/gold/"
+hist_path: "data/hist/"
+
+providers:
+  provider1:
+    subpath: "provider1/"
+    periodicity: "weekly"
+    format: "csv"
+    primary_key: ["movie_title","release_year"]
+
+  provider2:
+    subpath: "provider2/"
+    periodicity: "twice_a_month"
+    format: "json"
+    primary_key: ["title","year"]
+
+  provider3:
+    subpath: "provider3/"
+    periodicity: "monthly"
+    format: "csv"
+    primary_key: ["film_name","year_of_release"]
+
+
+
