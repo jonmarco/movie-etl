@@ -1,0 +1,44 @@
+# -------------------------
+# Python cache / bytecode
+# -------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# -------------------------
+# Virtual environments
+# -------------------------
+.venv/
+venv/
+env/
+
+# -------------------------
+# Logs
+# -------------------------
+*.log
+
+# -------------------------
+# IDE / Editor configs
+# -------------------------
+.vscode/
+
+
+# -------------------------
+# Data directories
+# -------------------------
+
+data/*
+
+# allow empty folders
+!data/bronze/
+!data/silver/
+!data/gold/
+!data/hist/
+
+# -------------------------
+# Output of the pipeline
+# -------------------------
+output/
+*.csv
+*.json
