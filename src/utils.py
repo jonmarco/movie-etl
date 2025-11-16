@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
+import fnmatch
 
 
 def get_latest_folder(path: str, prefix: str) -> Optional[str]:
@@ -153,7 +154,7 @@ def read_json_from_dir(directory: str) -> pd.DataFrame:
 
 
 
-def read_data_from_dir(directory: str, extension: str, merge_keys: list = None) -> pd.DataFrame:
+def read_data_from_dir(directory: str, extension: str, merge_keys: list = None, rename_by_filename: list =None) -> pd.DataFrame:
     """
     Reads and consolidates data files from a directory, supporting both CSV and JSON formats.
 
@@ -172,6 +173,8 @@ def read_data_from_dir(directory: str, extension: str, merge_keys: list = None) 
     merge_keys : list, optional
         Columns to group by after loading the data. If provided,
         the function returns the first record of each group.
+    rename_by_filename : list, optional
+        A list of rename rules applied based on the filename.
 
     Returns
     -------
@@ -185,31 +188,55 @@ def read_data_from_dir(directory: str, extension: str, merge_keys: list = None) 
     if extension is None:
         extensions = ["csv", "json"]
     else:
-        extensions = [extension]
+        extensions = [extension.lower()]
 
-    readers = {
-        "csv": read_csv_from_dir,
-        "json": read_json_from_dir
-    }
+    supported = {"csv", "json"}
+    for ext in extensions:
+        if ext not in supported:
+            raise ValueError(f"Unsupported extension: {ext}. Supported: {sorted(supported)}")
 
     dfs: List[pd.DataFrame] = []
     found_any = False
+
     for ext in extensions:
-        if ext.lower() not in readers:
+        file_paths = sorted(Path(directory).glob(f"*.{ext}"))
+        if not file_paths:
             continue
-        try:
-            df = readers[ext.lower()](directory)
+
+        for fpath in file_paths:
+            if ext == "csv":
+                df = pd.read_csv(fpath)
+            elif ext == "json":
+                df = pd.read_json(fpath)
+            else:
+                continue
+
+            df.columns = (
+                df.columns.astype(str)
+                .str.strip()
+            )
+
+            if rename_by_filename:
+                for rule in rename_by_filename:
+                    pattern = rule.get("match_glob")
+                    rename_map = rule.get("rename", {})
+                    if not pattern or not rename_map:
+                        continue
+                    if fnmatch.fnmatch(str(fpath), pattern) or fnmatch.fnmatch(fpath.name, pattern):
+                        df = df.rename(columns=rename_map)
+
             dfs.append(df)
             found_any = True
-        except FileNotFoundError:
-            continue
 
     if not found_any:
-        raise FileNotFoundError(f"No files with extensions {extensions} found in {directory}")
+        raise FileNotFoundError(
+            f"No files with extensions {extensions} found in {directory}"
+        )
 
-    df_all = pd.concat(dfs, ignore_index=True)
+    df_all = pd.concat(dfs, ignore_index=True, sort=False)
 
     if merge_keys:
+        df_all = df_all.sort_values(merge_keys)
         df_all = df_all.groupby(merge_keys, as_index=False).first()
 
     return df_all

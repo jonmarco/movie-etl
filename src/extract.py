@@ -52,7 +52,7 @@ def extract_latest_data_all_providers(config: Dict) -> Dict[str, pd.DataFrame]:
             continue
         
         try:
-            provider_df = read_data_from_dir(last_path, info.get("format", ""), info.get("primary_key", []))
+            provider_df = read_data_from_dir(last_path, info.get("format", ""), info.get("primary_key", []), info.get("file_level_renames", []))
             data[provider] = provider_df
             print(f"Loaded {len(provider_df)} rows for provider {provider} from {last_path}")
         except FileNotFoundError as e:

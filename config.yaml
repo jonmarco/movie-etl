@@ -11,18 +11,45 @@ providers:
     periodicity: "weekly"
     format: "csv"
     primary_key: ["movie_title","release_year"]
+    mapping:
+      movie_title: movie_title
+      release_year: release_year
+      critic_score_percentage: critic_score_percentage
+      top_critic_score: top_critic_score
+      total_critic_reviews_counted: total_critic_reviews_counted
 
   provider2:
     subpath: "provider2/"
     periodicity: "twice_a_month"
     format: "json"
     primary_key: ["title","year"]
+    mapping:
+      title: movie_title
+      year: release_year
+      audience_average_score: audience_average_score
+      total_audience_ratings: total_audience_ratings
+      domestic_box_office_gross: domestic_box_office_gross
 
   provider3:
     subpath: "provider3/"
     periodicity: "monthly"
     format: "csv"
     primary_key: ["film_name","year_of_release"]
+    mapping:
+      film_name: movie_title
+      year_of_release: release_year
+      domestic_box_office_usd: domestic_box_office_usd
+      international_box_office_usd: international_box_office_usd 
+      production_budget_usd: production_budget_usd
+      marketing_spend_usd: marketing_spend_usd 
+
+    file_level_renames:
+      - match_glob: "**/provider3_domestic.csv"     
+        rename:
+          box_office_gross_usd: domestic_box_office_usd
+      - match_glob: "**/provider3_international.csv" 
+        rename:
+          box_office_gross_usd: international_box_office_usd         
 
 
 
