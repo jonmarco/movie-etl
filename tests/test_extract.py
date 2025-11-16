@@ -9,28 +9,6 @@ from src.extract import (
 )
 
 class TestExtract:
-    def test_load_config_ok(self, tmp_path):
-        # Crear un archivo YAML temporal
-        config_file = tmp_path / "config.yaml"
-        config_content = {
-            "bronze_path": str(tmp_path),
-            "providers": {
-                "provider1": {"subpath": "provider1", "format": "csv", "primary_key": ["movie_id"]}
-            }
-        }
-        config_file.write_text(yaml.dump(config_content))
-
-        # Cargar config
-        config = load_config(str(config_file))
-        assert isinstance(config, dict)
-        assert "bronze_path" in config
-        assert "providers" in config
-        assert "provider1" in config["providers"]
-
-    def test_load_config_missing_file(self, tmp_path):
-        missing_file = tmp_path / "no_config.yaml"
-        with pytest.raises(FileNotFoundError):
-            load_config(str(missing_file)) 
 
     def test_extract_latest_data_all_providers(self, tmp_path):
         provider_dir = tmp_path / "provider1" / "year=2025" / "month=11" / "day=15"

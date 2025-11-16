@@ -2,7 +2,9 @@ import os
 import json
 import pytest
 import pandas as pd
+import yaml
 from src.utils import (
+    load_config,
     get_latest_folder,
     get_last_file_path,
     read_csv_from_dir,
@@ -11,6 +13,28 @@ from src.utils import (
 )
 
 class TestUtils:
+
+    def test_load_config_ok(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_content = {
+            "bronze_path": str(tmp_path),
+            "providers": {
+                "provider1": {"subpath": "provider1", "format": "csv", "primary_key": ["movie_id"]}
+            }
+        }
+        config_file.write_text(yaml.dump(config_content))
+
+        config = load_config(str(config_file))
+        assert isinstance(config, dict)
+        assert "bronze_path" in config
+        assert "providers" in config
+        assert "provider1" in config["providers"]
+
+    def test_load_config_missing_file(self, tmp_path):
+        missing_file = tmp_path / "no_config.yaml"
+        with pytest.raises(FileNotFoundError):
+            load_config(str(missing_file)) 
+
 
     def test_get_latest_folder(self, tmp_path):
         d1 = tmp_path / "year=2022"

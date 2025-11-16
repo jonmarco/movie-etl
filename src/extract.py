@@ -3,20 +3,7 @@ import yaml
 import logging
 import pandas as pd
 from typing import Dict
-from src.utils import get_last_file_path, read_data_from_dir
-
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), "../config.yaml")
-
-def load_config(config_path: str = CONFIG_FILE) -> Dict:
-    """
-    Loads the YAML configuration file and returns it as a dictionary.
-    """
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"Configuration file {config_path} does not exist.")
-
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    return config
+from src.utils import get_last_file_path, read_data_from_dir, load_config
 
 def extract_latest_data_all_providers(config: Dict) -> Dict[str, pd.DataFrame]:
     """
