@@ -178,11 +178,6 @@ def read_data_from_dir(directory: str, extension: str, merge_keys: list = None) 
     pandas.DataFrame
         A DataFrame containing all loaded and optionally grouped data.
 
-    Raises
-    ------
-    FileNotFoundError
-        If the directory does not exist or no files with the given extension(s)
-        are found.
     """
     if not os.path.exists(directory):
         raise FileNotFoundError(f"The directory {directory} does not exist.")

@@ -1,7 +1,9 @@
 import os
 import yaml
+import logging
 import pandas as pd
 from typing import Dict
+from src.utils import get_last_file_path, read_data_from_dir
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "../config.yaml")
 
@@ -16,7 +18,52 @@ def load_config(config_path: str = CONFIG_FILE) -> Dict:
         config = yaml.safe_load(f)
     return config
 
+def extract_latest_data_all_providers(config: Dict) -> Dict[str, pd.DataFrame]:
+    """
+    Extracts the latest data for each provider based on their latest folder.
+
+    Iterates over providers in the config, finds each provider's latest folder,
+    and reads the data into a single DataFrame per provider. Providers with no 
+    data are skipped.
+
+    Parameters
+    ----------
+    config : dict
+        Configuration dictionary with:
+            - "path": root path containing provider data
+            - "providers": dict mapping provider names to subpath, format, and primary_key
+
+    Returns
+    -------
+    dict[str, pandas.DataFrame]
+        Dictionary mapping provider names to consolidated DataFrames.
+    """
+    data = {}
+
+    logging.info("Extract stage STARTED")
+
+    for provider, info in config.get("providers", {}).items():
+        logging.info(f"Reading data from {provider}")
+        base_path = os.path.join(config["bronze_path"], info.get("subpath", ""))
+        last_path = get_last_file_path(base_path)
+
+        if not last_path:
+            print(f"No files found for provider {provider}")
+            continue
+        
+        try:
+            provider_df = read_data_from_dir(last_path, info.get("format", ""), info.get("primary_key", []))
+            data[provider] = provider_df
+            print(f"Loaded {len(provider_df)} rows for provider {provider} from {last_path}")
+        except FileNotFoundError as e:
+            print(f"Skipping {provider}: {e}")
+        
+    return data
+
 if __name__ == "__main__":
     config = load_config()
+    extracted_data = extract_latest_data_all_providers(config)
 
-    print(config)
+    for provider, df in extracted_data.items():
+        print(f"{provider}: {len(df)} rows")
+        print(df.head(5))
