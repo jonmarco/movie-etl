@@ -51,5 +51,16 @@ providers:
         rename:
           box_office_gross_usd: international_box_office_usd         
 
-
-
+casts:
+  movie_title: string
+  release_year: int
+  critic_score_percentage: float
+  top_critic_score: float
+  total_critic_reviews_counted: int
+  audience_average_score: float
+  total_audience_ratings: int
+  domestic_box_office_gross: int
+  domestic_box_office_usd: int
+  international_box_office_usd: int
+  production_budget_usd: int
+  marketing_spend_usd: int
