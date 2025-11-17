@@ -3,9 +3,9 @@ import yaml
 import logging
 import pandas as pd
 from typing import Dict
-from src.utils import load_config, get_last_file_path, write_dataset, read_files_from_dir, merge_dataframes
-from src.extract import extract_latest_data_all_providers
-from src.transform import transform_and_write_to_silver
+from utils import load_config, get_last_file_path, write_dataset, read_files_from_dir, merge_dataframes
+# from extract import extract_latest_data_all_providers
+# from transform import transform_and_write_to_silver
 
 def extract_latest_data_silver(config: Dict) -> pd.DataFrame:
     """
@@ -65,7 +65,15 @@ def extract_latest_data_silver(config: Dict) -> pd.DataFrame:
 
 if __name__ == "__main__":
     config = load_config()
-    extracted_data = extract_latest_data_all_providers(config)
-    written = transform_and_write_to_silver(config, extracted_data)
+    # extracted_data = extract_latest_data_all_providers(config)
+    # written = transform_and_write_to_silver(config, extracted_data)
     gold_df = extract_latest_data_silver(config)
     print(gold_df.head(5))
+
+    out_path = write_dataset(
+                df=gold_df,
+                config=config,
+                layer="gold",                
+                fmt=config["gold_data_format"],
+                filename=config["gold_filename"],                
+            )

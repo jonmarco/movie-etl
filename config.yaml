@@ -67,5 +67,5 @@ casts:
 
 silver_data_format: "parquet"
 gold_data_format: "parquet"
-
 gold_primary_key: ["movie_title", "release_year"]
+gold_filename: "movies"
