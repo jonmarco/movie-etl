@@ -168,33 +168,119 @@ def read_json_from_dir(directory: str) -> pd.DataFrame:
     return pd.concat(dfs, ignore_index=True)
 
 
-def read_data_from_bronze_dir(directory: str, extension: str, merge_keys: list = None, rename_by_filename: list =None) -> pd.DataFrame:
-    """
-    Reads and consolidates data files from a directory, supporting both CSV and JSON formats.
+# def read_data_from_bronze_dir(directory: str, extension: str, merge_keys: list = None, rename_by_filename: list =None) -> pd.DataFrame:
+#     """
+#     Reads and consolidates data files from a directory, supporting both CSV and JSON formats.
 
-    The function uses the appropriate reader based on the 'extension' argument.
-    If 'extension' is 'None', both CSV and JSON files are considered.
-    All loaded DataFrames are concatenated into a single DataFrame.
-    Optionally, the resulting DataFrame can be grouped by one or more keys,
-    returning only the first occurrence per group.
+#     The function uses the appropriate reader based on the 'extension' argument.
+#     If 'extension' is 'None', both CSV and JSON files are considered.
+#     All loaded DataFrames are concatenated into a single DataFrame.
+#     Optionally, the resulting DataFrame can be grouped by one or more keys,
+#     returning only the first occurrence per group.
+
+#     Parameters
+#     ----------
+#     directory : str
+#         Path to the directory containing data files.
+#     extension : str
+#         File extension to load ("csv", "json"), or 'None' to load both.
+#     merge_keys : list, optional
+#         Columns to group by after loading the data. If provided,
+#         the function returns the first record of each group.
+#     rename_by_filename : list, optional
+#         A list of rename rules applied based on the filename.
+
+#     Returns
+#     -------
+#     pandas.DataFrame
+#         A DataFrame containing all loaded and optionally grouped data.
+
+#     """
+#     if not os.path.exists(directory):
+#         raise FileNotFoundError(f"The directory {directory} does not exist.")
+
+#     if extension is None:
+#         extensions = ["csv", "json"]
+#     else:
+#         extensions = [extension.lower()]
+
+#     supported = {"csv", "json"}
+#     for ext in extensions:
+#         if ext not in supported:
+#             raise ValueError(f"Unsupported extension: {ext}. Supported: {sorted(supported)}")
+
+#     dfs: List[pd.DataFrame] = []
+#     found_any = False
+
+#     for ext in extensions:
+#         file_paths = sorted(Path(directory).glob(f"*.{ext}"))
+#         if not file_paths:
+#             continue
+
+#         for fpath in file_paths:
+#             if ext == "csv":
+#                 df = pd.read_csv(fpath)
+#             elif ext == "json":
+#                 df = pd.read_json(fpath)
+#             else:
+#                 continue
+
+#             df.columns = (
+#                 df.columns.astype(str)
+#                 .str.strip()
+#             )
+
+#             if rename_by_filename:
+#                 for rule in rename_by_filename:
+#                     pattern = rule.get("match_glob")
+#                     rename_map = rule.get("rename", {})
+#                     if not pattern or not rename_map:
+#                         continue
+#                     if fnmatch.fnmatch(str(fpath), pattern) or fnmatch.fnmatch(fpath.name, pattern):
+#                         df = df.rename(columns=rename_map)
+
+#             dfs.append(df)
+#             found_any = True
+
+#     if not found_any:
+#         raise FileNotFoundError(
+#             f"No files with extensions {extensions} found in {directory}"
+#         )
+
+#     df_all = pd.concat(dfs, ignore_index=True, sort=False)
+
+#     if merge_keys:
+#         df_all = df_all.sort_values(merge_keys)
+#         df_all = df_all.groupby(merge_keys, as_index=False).first()
+
+#     return df_all
+
+def read_files_from_dir(directory: str, extension: Optional[str] = None) -> List[pd.DataFrame]:
+    """
+    Reads all data files from a directory, supporting both CSV and JSON formats.
+
+    The function reads all files in the specified directory based on the given extension.
+    If 'extension' is None, both CSV and JSON files are considered.
+    Each file is read into a DataFrame, and all DataFrames are returned as a list.
 
     Parameters
     ----------
     directory : str
         Path to the directory containing data files.
-    extension : str
-        File extension to load ("csv", "json"), or 'None' to load both.
-    merge_keys : list, optional
-        Columns to group by after loading the data. If provided,
-        the function returns the first record of each group.
-    rename_by_filename : list, optional
-        A list of rename rules applied based on the filename.
+    extension : str, optional
+        File extension to load ("csv", "json"), or None to load both.
 
     Returns
     -------
-    pandas.DataFrame
-        A DataFrame containing all loaded and optionally grouped data.
+    list[pandas.DataFrame]
+        A list of DataFrames, one per file found in the directory.
 
+    Raises
+    ------
+    FileNotFoundError
+        If the directory does not exist or contains no files matching the extensions.
+    ValueError
+        If an unsupported extension is provided.
     """
     if not os.path.exists(directory):
         raise FileNotFoundError(f"The directory {directory} does not exist.")
@@ -210,8 +296,6 @@ def read_data_from_bronze_dir(directory: str, extension: str, merge_keys: list =
             raise ValueError(f"Unsupported extension: {ext}. Supported: {sorted(supported)}")
 
     dfs: List[pd.DataFrame] = []
-    found_any = False
-
     for ext in extensions:
         file_paths = sorted(Path(directory).glob(f"*.{ext}"))
         if not file_paths:
@@ -225,27 +309,84 @@ def read_data_from_bronze_dir(directory: str, extension: str, merge_keys: list =
             else:
                 continue
 
-            df.columns = (
-                df.columns.astype(str)
-                .str.strip()
-            )
+            df.columns = df.columns.astype(str).str.strip()
 
-            if rename_by_filename:
-                for rule in rename_by_filename:
-                    pattern = rule.get("match_glob")
-                    rename_map = rule.get("rename", {})
-                    if not pattern or not rename_map:
-                        continue
-                    if fnmatch.fnmatch(str(fpath), pattern) or fnmatch.fnmatch(fpath.name, pattern):
-                        df = df.rename(columns=rename_map)
+            df.attrs["source_file"] = str(fpath)
 
             dfs.append(df)
-            found_any = True
 
-    if not found_any:
-        raise FileNotFoundError(
-            f"No files with extensions {extensions} found in {directory}"
-        )
+    if not dfs:
+        raise FileNotFoundError(f"No files with extensions {extensions} found in {directory}")
+
+    return dfs
+
+
+def apply_file_level_renames(
+    dfs: List[pd.DataFrame],
+    rename_by_filename: Optional[List[Dict]] = None,
+) -> List[pd.DataFrame]:
+    """
+    Applies renaming rules to each DataFrame based on filename patterns.
+
+    The function iterates over each DataFrame and applies column renaming
+    rules defined in the 'rename_by_filename' list, matching patterns
+    against the file name or path.
+
+    Parameters
+    ----------
+    dfs : list[pandas.DataFrame]
+        List of DataFrames to process.
+    rename_by_filename : list[dict], optional
+        A list of rename rules applied based on the filename.
+
+    Returns
+    -------
+    list[pandas.DataFrame]
+        List of DataFrames with renamed columns where applicable.
+    """
+    if not rename_by_filename:
+        return dfs
+
+    renamed_dfs: List[pd.DataFrame] = []
+    for df in dfs:
+        fpath = df.attrs.get("source_file", "")
+        for rule in rename_by_filename:
+            pattern = rule.get("match_glob")
+            rename_map = rule.get("rename", {})
+            if not pattern or not rename_map:
+                continue
+
+            # Check if filename matches the pattern
+            if fnmatch.fnmatch(fpath, pattern) or fnmatch.fnmatch(os.path.basename(fpath), pattern):
+                df = df.rename(columns=rename_map)
+
+        renamed_dfs.append(df)
+
+    return renamed_dfs
+
+
+def merge_dataframes(
+    dfs: List[pd.DataFrame],
+    merge_keys: Optional[List[str]] = None,
+) -> pd.DataFrame:
+    """
+    Concatenates and consolidates a list of DataFrames into a single DataFrame.
+
+    Parameters
+    ----------
+    dfs : list[pandas.DataFrame]
+        List of DataFrames to merge.
+    merge_keys : list, optional
+        Columns to group by after merging the data.
+        If provided, the function returns the first record of each group.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A DataFrame containing all merged and optionally grouped data.
+    """
+    if not dfs:
+        return pd.DataFrame()
 
     df_all = pd.concat(dfs, ignore_index=True, sort=False)
 
@@ -256,6 +397,41 @@ def read_data_from_bronze_dir(directory: str, extension: str, merge_keys: list =
     return df_all
 
 
+def read_data_from_bronze_dir(
+    directory: str,
+    extension: Optional[str],
+    merge_keys: Optional[List[str]] = None,
+    rename_by_filename: Optional[List[Dict]] = None,
+) -> pd.DataFrame:
+    """
+    Reads, renames, and merges data from a Bronze directory.
+
+    This function is a high-level wrapper that:
+      1. Reads all data files from the directory.
+      2. Applies file-level renaming rules (if provided).
+      3. Merges and groups the resulting DataFrames into one.
+
+    Parameters
+    ----------
+    directory : str
+        Path to the directory containing data files.
+    extension : str
+        File extension to load ("csv", "json"), or None to load both.
+    merge_keys : list, optional
+        Columns to group by after merging the data. If provided,
+        the function returns the first record of each group.
+    rename_by_filename : list, optional
+        A list of rename rules applied based on the filename.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A consolidated DataFrame after reading, renaming, and merging.
+    """
+    dfs = read_files_from_dir(directory, extension)
+    dfs = apply_file_level_renames(dfs, rename_by_filename)
+    df_all = merge_dataframes(dfs, merge_keys)
+    return df_all
 
 
 

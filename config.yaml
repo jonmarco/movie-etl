@@ -64,3 +64,5 @@ casts:
   international_box_office_usd: int
   production_budget_usd: int
   marketing_spend_usd: int
+
+gold_primary_key: ["movie_title", "release_year"]

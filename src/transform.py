@@ -3,8 +3,8 @@ import yaml
 import logging
 import pandas as pd
 from typing import Dict
-from src.utils import load_config, get_last_file_path, write_dataset
-from src.extract import extract_latest_data_all_providers
+from utils import load_config, get_last_file_path, write_dataset
+from extract import extract_latest_data_all_providers
 
 def apply_config_renames(provider: str, config: Dict, df: pd.DataFrame) -> pd.DataFrame:
     """
