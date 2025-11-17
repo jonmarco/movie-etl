@@ -1,3 +1,5 @@
 pandas
 pytest
 pyyaml
+pyarrow>=16
+fastparquet

@@ -3,20 +3,7 @@ import yaml
 import logging
 import pandas as pd
 from typing import Dict
-from src.utils import get_last_file_path, read_data_from_dir
-
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), "../config.yaml")
-
-def load_config(config_path: str = CONFIG_FILE) -> Dict:
-    """
-    Loads the YAML configuration file and returns it as a dictionary.
-    """
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"Configuration file {config_path} does not exist.")
-
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    return config
+from src.utils import get_last_file_path, read_data_from_dir, load_config
 
 def extract_latest_data_all_providers(config: Dict) -> Dict[str, pd.DataFrame]:
     """
@@ -45,19 +32,27 @@ def extract_latest_data_all_providers(config: Dict) -> Dict[str, pd.DataFrame]:
     for provider, info in config.get("providers", {}).items():
         logging.info(f"Reading data from {provider}")
         base_path = os.path.join(config["bronze_path"], info.get("subpath", ""))
-        last_path = get_last_file_path(base_path)
 
-        if not last_path:
-            print(f"No files found for provider {provider}")
+        relative_last_path = get_last_file_path(base_path)
+
+        if not relative_last_path:
+            logging.info(f"No latest partition found for provider '{provider}' under {base_path}. Skipping.")
             continue
-        
+
+        full_last_path = os.path.join(base_path, relative_last_path)
+
         try:
-            provider_df = read_data_from_dir(last_path, info.get("format", ""), info.get("primary_key", []))
+            provider_df = read_data_from_dir(
+                full_last_path,
+                info.get("format", ""),
+                info.get("primary_key", []),
+                info.get("file_level_renames", []),
+            )
             data[provider] = provider_df
-            print(f"Loaded {len(provider_df)} rows for provider {provider} from {last_path}")
+            logging.info(f"Loaded {len(provider_df)} rows for provider {provider} from {full_last_path}")
         except FileNotFoundError as e:
-            print(f"Skipping {provider}: {e}")
-        
+            logging.warning(f"Skipping {provider}: {e}")
+
     return data
 
 if __name__ == "__main__":

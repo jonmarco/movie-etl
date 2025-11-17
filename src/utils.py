@@ -2,7 +2,23 @@ import os
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Union, Iterable
+import yaml
+import fnmatch
+
+
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "../config.yaml")
+
+def load_config(config_path: str = CONFIG_FILE) -> Dict:
+    """
+    Loads the YAML configuration file and returns it as a dictionary.
+    """
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Configuration file {config_path} does not exist.")
+
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    return config
 
 
 def get_latest_folder(path: str, prefix: str) -> Optional[str]:
@@ -30,16 +46,15 @@ def get_latest_folder(path: str, prefix: str) -> Optional[str]:
     max_number = max(numbers)
     return f"{prefix}{max_number:02d}"
 
-from pathlib import Path
-from typing import Optional
 
 def get_last_file_path(provider_path: str) -> Optional[str]:
     """
-    Returns the full path of the latest directory based on a date-structured hierarchy.
+    Returns the relative path of the latest directory based on a date-structured hierarchy.
 
     The expected directory structure is:
-    provider_path/year=YYYY/month=MM/day=DD/
-    The returned path is normalized to use '/' as the separator (POSIX format).
+        provider_path/year=YYYY/month=MM/day=DD/
+    The returned path is the concatenation of the latest year, month, and day
+    folders (e.g., "year=2025/month=11/day=17"), using POSIX separators.
 
     Parameters
     ----------
@@ -49,9 +64,8 @@ def get_last_file_path(provider_path: str) -> Optional[str]:
     Returns
     -------
     Optional[str]
-        The full path of the latest day folder according to the directory structure.
+        The relative path (year=YYYY/month=MM/day=DD) of the latest batch folder.
         Returns None if any of the year, month, or day folders are missing.
-
     """
     provider_path = Path(provider_path)
 
@@ -61,19 +75,20 @@ def get_last_file_path(provider_path: str) -> Optional[str]:
     year_folder = get_latest_folder(str(provider_path), "year=")
     if not year_folder:
         return None
-    year_path = provider_path / year_folder
 
+    year_path = provider_path / year_folder
     month_folder = get_latest_folder(str(year_path), "month=")
     if not month_folder:
         return None
-    month_path = year_path / month_folder
 
+    month_path = year_path / month_folder
     day_folder = get_latest_folder(str(month_path), "day=")
     if not day_folder:
         return None
-    day_path = month_path / day_folder
 
-    return day_path.as_posix()
+    concatenated_directory = Path(year_folder) / Path(month_folder) / Path(day_folder)
+    return concatenated_directory.as_posix()
+
 
 
 def read_csv_from_dir(directory: str) -> pd.DataFrame:
@@ -153,7 +168,7 @@ def read_json_from_dir(directory: str) -> pd.DataFrame:
 
 
 
-def read_data_from_dir(directory: str, extension: str, merge_keys: list = None) -> pd.DataFrame:
+def read_data_from_dir(directory: str, extension: str, merge_keys: list = None, rename_by_filename: list =None) -> pd.DataFrame:
     """
     Reads and consolidates data files from a directory, supporting both CSV and JSON formats.
 
@@ -172,6 +187,8 @@ def read_data_from_dir(directory: str, extension: str, merge_keys: list = None) 
     merge_keys : list, optional
         Columns to group by after loading the data. If provided,
         the function returns the first record of each group.
+    rename_by_filename : list, optional
+        A list of rename rules applied based on the filename.
 
     Returns
     -------
@@ -185,31 +202,135 @@ def read_data_from_dir(directory: str, extension: str, merge_keys: list = None) 
     if extension is None:
         extensions = ["csv", "json"]
     else:
-        extensions = [extension]
+        extensions = [extension.lower()]
 
-    readers = {
-        "csv": read_csv_from_dir,
-        "json": read_json_from_dir
-    }
+    supported = {"csv", "json"}
+    for ext in extensions:
+        if ext not in supported:
+            raise ValueError(f"Unsupported extension: {ext}. Supported: {sorted(supported)}")
 
     dfs: List[pd.DataFrame] = []
     found_any = False
+
     for ext in extensions:
-        if ext.lower() not in readers:
+        file_paths = sorted(Path(directory).glob(f"*.{ext}"))
+        if not file_paths:
             continue
-        try:
-            df = readers[ext.lower()](directory)
+
+        for fpath in file_paths:
+            if ext == "csv":
+                df = pd.read_csv(fpath)
+            elif ext == "json":
+                df = pd.read_json(fpath)
+            else:
+                continue
+
+            df.columns = (
+                df.columns.astype(str)
+                .str.strip()
+            )
+
+            if rename_by_filename:
+                for rule in rename_by_filename:
+                    pattern = rule.get("match_glob")
+                    rename_map = rule.get("rename", {})
+                    if not pattern or not rename_map:
+                        continue
+                    if fnmatch.fnmatch(str(fpath), pattern) or fnmatch.fnmatch(fpath.name, pattern):
+                        df = df.rename(columns=rename_map)
+
             dfs.append(df)
             found_any = True
-        except FileNotFoundError:
-            continue
 
     if not found_any:
-        raise FileNotFoundError(f"No files with extensions {extensions} found in {directory}")
+        raise FileNotFoundError(
+            f"No files with extensions {extensions} found in {directory}"
+        )
 
-    df_all = pd.concat(dfs, ignore_index=True)
+    df_all = pd.concat(dfs, ignore_index=True, sort=False)
 
     if merge_keys:
+        df_all = df_all.sort_values(merge_keys)
         df_all = df_all.groupby(merge_keys, as_index=False).first()
 
     return df_all
+
+
+
+def write_dataset(
+    df: pd.DataFrame,
+    config: Dict,
+    layer: str,
+    provider: Optional[str] = None,
+    *,
+    fmt: str = "parquet",
+    filename: str = "data_clean",
+    relative_partition_path: Optional[str] = None,
+    overwrite: bool = True,
+) -> str:
+    """
+    Write a DataFrame to a configured layer (e.g., silver, hist, gold), supporting
+    both Parquet and CSV outputs and flexible partitioning.
+
+    If you pass `relative_partition_path` (e.g., "year=2025/month=11/day=17"),
+    that path will be used directly, if not, will directly write in base_path.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Data to persist.
+    config : dict
+        Configuration file.
+    layer : str
+        Target layer key.
+    provider : str, optional
+        Optional subfolder under the partition path.
+    fmt : {'parquet','csv'}, default 'parquet'
+        Output file format.
+    filename : str, default 'data_clean'
+        Base filename (without extension).
+    relative_partition_path : str, optional
+        Relative partition path to reuse an existing partition.
+
+    overwrite : bool, default True
+        If False and file exists, raises FileExistsError.
+
+    Returns
+    -------
+    str
+        Full path of the written file.
+
+    """
+    layer_key = f"{layer}_path"
+    if layer_key not in config:
+        raise KeyError(f"config must include '{layer_key}'")
+
+    fmt = fmt.lower()
+    if fmt not in {"parquet", "csv"}:
+        raise ValueError(f"Unsupported fmt='{fmt}'. Use 'parquet' or 'csv'.")
+
+    base_path = config[layer_key]
+
+    parts: Iterable[str] = [base_path]
+
+    if relative_partition_path:
+        parts += [relative_partition_path]
+
+    if provider:
+        parts += [provider]
+
+    out_dir = os.path.join(*parts)
+    os.makedirs(out_dir, exist_ok=True)
+
+    ext = ".parquet" if fmt == "parquet" else ".csv"
+    out_path = os.path.join(out_dir, f"{filename}{ext}")
+
+    if not overwrite and os.path.exists(out_path):
+        raise FileExistsError(f"Output already exists: {out_path}")
+
+    if fmt == "parquet":
+        df.to_parquet(out_path, index=False)
+    else:
+        df.to_csv(out_path, index=False)
+
+    return out_path
