@@ -59,12 +59,13 @@ def extract_latest_data_silver(config: Dict) -> pd.DataFrame:
     gold_pk = config["gold_primary_key"]
     united_dataframe = merge_dataframes(df_union, merge_keys=gold_pk)
     
+
     return united_dataframe
 
 
 if __name__ == "__main__":
     config = load_config()
     extracted_data = extract_latest_data_all_providers(config)
-    written = transform_and_write_to_silver(config, extracted_data, fmt="parquet")
+    written = transform_and_write_to_silver(config, extracted_data)
     gold_df = extract_latest_data_silver(config)
     print(gold_df.head(5))

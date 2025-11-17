@@ -102,8 +102,7 @@ def apply_config_casts(df: pd.DataFrame, config: Dict) -> pd.DataFrame:
 
 def transform_and_write_to_silver(
     config: Dict,
-    extracted_data: Dict[str, pd.DataFrame],
-    fmt: str = "parquet",
+    extracted_data: Dict[str, pd.DataFrame],    
     filename: str = "data_clean",
 ) -> Dict[str, str]:
     """
@@ -120,8 +119,7 @@ def transform_and_write_to_silver(
         Loaded configuration dictionary (must contain 'bronze_path' and 'silver_path').
     extracted_data : dict[str, pandas.DataFrame]
         Output from extract_latest_data_all_providers().
-    fmt : {'parquet','csv'}, default 'parquet'
-        Output format for the Silver layer.
+
     filename : str, default 'data_clean'
         Base filename for the written files.
 
@@ -131,6 +129,7 @@ def transform_and_write_to_silver(
         Dictionary mapping provider names to their written Silver file paths.
     """
     written_paths: Dict[str, str] = {}
+    
     logging.info("Silver transform stage STARTED")
 
     for provider, df in extracted_data.items():
@@ -152,7 +151,7 @@ def transform_and_write_to_silver(
                 config=config,
                 layer="silver",
                 provider=provider,
-                fmt=fmt,
+                fmt=config["silver_data_format"],
                 filename=filename,
                 relative_partition_path=relative_partition_path,
             )
@@ -168,8 +167,7 @@ def transform_and_write_to_silver(
 if __name__ == "__main__":
     config = load_config()
     extracted_data = extract_latest_data_all_providers(config)
-
-    written = transform_and_write_to_silver(config, extracted_data, fmt="parquet")
+    written = transform_and_write_to_silver(config, extracted_data)
 
     """
     for provider, df in extracted_data.items():
