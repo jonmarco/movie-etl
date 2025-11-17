@@ -3,7 +3,7 @@ import yaml
 import logging
 import pandas as pd
 from typing import Dict
-from utils import get_last_file_path, read_data_from_bronze_dir, load_config
+from src.utils import get_last_file_path, read_data_from_bronze_dir, load_config
 
 
 def extract_latest_data_all_providers(config: Dict) -> Dict[str, pd.DataFrame]:
