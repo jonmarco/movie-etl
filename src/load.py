@@ -5,7 +5,7 @@ import pandas as pd
 from typing import Dict
 from src.utils import load_config, get_last_file_path, write_dataset, read_files_from_dir, merge_dataframes
 from src.extract import extract_latest_data_all_providers
-from transform import transform_and_write_to_silver
+from src.transform import transform_and_write_to_silver
 
 def extract_latest_data_silver(config: Dict) -> pd.DataFrame:
     """
