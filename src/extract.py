@@ -3,7 +3,8 @@ import yaml
 import logging
 import pandas as pd
 from typing import Dict
-from src.utils import get_last_file_path, read_data_from_dir, load_config
+from src.utils import get_last_file_path, read_data_from_bronze_dir, load_config
+
 
 def extract_latest_data_all_providers(config: Dict) -> Dict[str, pd.DataFrame]:
     """
@@ -42,7 +43,7 @@ def extract_latest_data_all_providers(config: Dict) -> Dict[str, pd.DataFrame]:
         full_last_path = os.path.join(base_path, relative_last_path)
 
         try:
-            provider_df = read_data_from_dir(
+            provider_df = read_data_from_bronze_dir(
                 full_last_path,
                 info.get("format", ""),
                 info.get("primary_key", []),
@@ -54,6 +55,8 @@ def extract_latest_data_all_providers(config: Dict) -> Dict[str, pd.DataFrame]:
             logging.warning(f"Skipping {provider}: {e}")
 
     return data
+
+
 
 if __name__ == "__main__":
     config = load_config()

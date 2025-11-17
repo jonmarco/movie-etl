@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Union, Iterable
 import yaml
 import fnmatch
+import logging
 
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "../config.yaml")
@@ -167,8 +168,7 @@ def read_json_from_dir(directory: str) -> pd.DataFrame:
     return pd.concat(dfs, ignore_index=True)
 
 
-
-def read_data_from_dir(directory: str, extension: str, merge_keys: list = None, rename_by_filename: list =None) -> pd.DataFrame:
+def read_data_from_bronze_dir(directory: str, extension: str, merge_keys: list = None, rename_by_filename: list =None) -> pd.DataFrame:
     """
     Reads and consolidates data files from a directory, supporting both CSV and JSON formats.
 
@@ -254,6 +254,8 @@ def read_data_from_dir(directory: str, extension: str, merge_keys: list = None, 
         df_all = df_all.groupby(merge_keys, as_index=False).first()
 
     return df_all
+
+
 
 
 

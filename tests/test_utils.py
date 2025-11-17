@@ -9,7 +9,7 @@ from src.utils import (
     get_last_file_path,
     read_csv_from_dir,
     read_json_from_dir,
-    read_data_from_dir
+    read_data_from_bronze_dir
 )
 
 class TestUtils:
@@ -100,7 +100,7 @@ class TestUtils:
         with pytest.raises(FileNotFoundError):
             read_json_from_dir(str(tmp_path))
 
-    def test_read_data_from_dir_csv_only(self, tmp_path):
+    def test_read_data_from_bronze_dir_csv_only(self, tmp_path):
         # Create CSV file
         f1 = tmp_path / "provider1_movie_data1.csv"
         f1.write_text(
@@ -109,13 +109,13 @@ class TestUtils:
             "The Dark Knight,2008,94"
         )
 
-        df = read_data_from_dir(str(tmp_path), extension="csv")
+        df = read_data_from_bronze_dir(str(tmp_path), extension="csv")
 
         assert len(df) == 2
         assert list(df.columns) == ["movie_title", "release_year", "critic_score_percentage"]
 
 
-    def test_read_data_from_dir_json_only(self, tmp_path):
+    def test_read_data_from_bronze_dir_json_only(self, tmp_path):
         # Create JSON file
         f1 = tmp_path / "provider2_movie_data1.json"
         f1.write_text(json.dumps([
@@ -123,13 +123,13 @@ class TestUtils:
             {"title": "The Dark Knight", "year": "2008", "audience_average_score": 9.4}
         ]))
 
-        df = read_data_from_dir(str(tmp_path), extension="json")
+        df = read_data_from_bronze_dir(str(tmp_path), extension="json")
 
         assert len(df) == 2
         assert list(df.columns) == ["title", "year", "audience_average_score"]
 
 
-    def test_read_data_from_dir_merge_two_csv(self, tmp_path):
+    def test_read_data_from_bronze_dir_merge_two_csv(self, tmp_path):
         f1 = tmp_path / "provider1_movie_data1.csv"
         f2 = tmp_path / "provider1_movie_data2.csv"
 
@@ -145,7 +145,7 @@ class TestUtils:
             "The Dark Knight,2008,2400000,535234033\n"
         )
 
-        df = read_data_from_dir(
+        df = read_data_from_bronze_dir(
             str(tmp_path),
             extension="csv",
             merge_keys=["movie_title", "release_year"]
@@ -158,9 +158,9 @@ class TestUtils:
         assert inc_row["critic_score_percentage"] == 87
         assert inc_row["total_audience_ratings"] == 2200000
 
-    def test_read_data_from_dir_no_valid_files(self, tmp_path):
+    def test_read_data_from_bronze_dir_no_valid_files(self, tmp_path):
         with pytest.raises(FileNotFoundError):
-            read_data_from_dir(str(tmp_path), extension="csv")
+            read_data_from_bronze_dir(str(tmp_path), extension="csv")
 
     def test_provider3_file_level_renames_and_merge(self, tmp_path):
 
@@ -188,7 +188,7 @@ class TestUtils:
             },
         ]
 
-        df = read_data_from_dir(
+        df = read_data_from_bronze_dir(
             directory=str(tmp_path),
             extension="csv",
             merge_keys=["film_name", "year_of_release"],
