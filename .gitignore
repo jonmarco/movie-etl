@@ -42,3 +42,4 @@ data/*
 output/
 *.csv
 *.json
+*.parquet

@@ -2,9 +2,10 @@ import os
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union, Iterable
 import yaml
 import fnmatch
+
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "../config.yaml")
 
@@ -253,3 +254,83 @@ def read_data_from_dir(directory: str, extension: str, merge_keys: list = None, 
         df_all = df_all.groupby(merge_keys, as_index=False).first()
 
     return df_all
+
+
+
+def write_dataset(
+    df: pd.DataFrame,
+    config: Dict,
+    layer: str,
+    provider: Optional[str] = None,
+    *,
+    fmt: str = "parquet",
+    filename: str = "data_clean",
+    relative_partition_path: Optional[str] = None,
+    overwrite: bool = True,
+) -> str:
+    """
+    Write a DataFrame to a configured layer (e.g., silver, hist, gold), supporting
+    both Parquet and CSV outputs and flexible partitioning.
+
+    If you pass `relative_partition_path` (e.g., "year=2025/month=11/day=17"),
+    that path will be used directly, if not, will directly write in base_path.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Data to persist.
+    config : dict
+        Configuration file.
+    layer : str
+        Target layer key.
+    provider : str, optional
+        Optional subfolder under the partition path.
+    fmt : {'parquet','csv'}, default 'parquet'
+        Output file format.
+    filename : str, default 'data_clean'
+        Base filename (without extension).
+    relative_partition_path : str, optional
+        Relative partition path to reuse an existing partition.
+
+    overwrite : bool, default True
+        If False and file exists, raises FileExistsError.
+
+    Returns
+    -------
+    str
+        Full path of the written file.
+
+    """
+    layer_key = f"{layer}_path"
+    if layer_key not in config:
+        raise KeyError(f"config must include '{layer_key}'")
+
+    fmt = fmt.lower()
+    if fmt not in {"parquet", "csv"}:
+        raise ValueError(f"Unsupported fmt='{fmt}'. Use 'parquet' or 'csv'.")
+
+    base_path = config[layer_key]
+
+    parts: Iterable[str] = [base_path]
+
+    if relative_partition_path:
+        parts += [relative_partition_path]
+
+    if provider:
+        parts += [provider]
+
+    out_dir = os.path.join(*parts)
+    os.makedirs(out_dir, exist_ok=True)
+
+    ext = ".parquet" if fmt == "parquet" else ".csv"
+    out_path = os.path.join(out_dir, f"{filename}{ext}")
+
+    if not overwrite and os.path.exists(out_path):
+        raise FileExistsError(f"Output already exists: {out_path}")
+
+    if fmt == "parquet":
+        df.to_parquet(out_path, index=False)
+    else:
+        df.to_csv(out_path, index=False)
+
+    return out_path

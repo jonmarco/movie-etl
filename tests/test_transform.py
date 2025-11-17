@@ -2,8 +2,10 @@ import pandas as pd
 import logging
 import pytest
 import numpy as np
+from pathlib import Path
 
-from src.transform import apply_config_renames, apply_config_casts
+
+from src.transform import apply_config_renames, apply_config_casts, transform_and_write_to_silver
 
 def test_apply_config_renames_basic():
 
@@ -148,3 +150,70 @@ def test_apply_config_casts_missing_and_invalid_values():
 
     assert df_out.loc[0, "audience_average_score"] == 9.0
     assert np.isnan(df_out.loc[1, "audience_average_score"])  #  NaN
+
+
+def test_transform_and_write_to_silver(tmp_path: Path):
+
+    bronze_root = tmp_path / "bronze"
+    silver_root = tmp_path / "silver"
+    bronze_root.mkdir()
+    silver_root.mkdir()
+
+    part_dir = bronze_root / "provider1" / "year=2025" / "month=11" / "day=17"
+    part_dir.mkdir(parents=True)
+
+    config = {
+        "bronze_path": str(bronze_root),
+        "silver_path": str(silver_root),
+        "providers": {
+            "provider1": {"subpath": "provider1", "format": "csv", "primary_key": ["movie_title", "release_year"]}
+        },
+        "casts": {"release_year": "int", "movie_title": "string"},
+    }
+
+    extracted = {
+        "provider1": pd.DataFrame({"movie_title": ["Inception"], "release_year": ["2010"]})
+    }
+
+    written = transform_and_write_to_silver(config, extracted, fmt="csv", filename="data_clean")
+
+    assert "provider1" in written
+    out_path = Path(written["provider1"])
+    assert out_path.name == "data_clean.csv"
+
+    expected_dir = silver_root / "year=2025" / "month=11" / "day=17" / "provider1"
+    assert out_path.parent == expected_dir
+
+    assert out_path.exists()
+    df_written = pd.read_csv(out_path)
+    assert len(df_written) == 1
+    assert set(df_written.columns) >= {"movie_title", "release_year"}
+
+
+def test_transform_and_write_to_silver_no_bronze_path(tmp_path: Path):
+
+    bronze_root = tmp_path / "bronze"
+    silver_root = tmp_path / "silver"
+    bronze_root.mkdir()
+    silver_root.mkdir()
+
+    (bronze_root / "provider1").mkdir()
+
+    config = {
+        "bronze_path": str(bronze_root),
+        "silver_path": str(silver_root),
+        "providers": {
+            "provider1": {"subpath": "provider1", "format": "csv", "primary_key": ["movie_title", "release_year"]}
+        },
+    }
+
+    extracted = {
+        "provider1": pd.DataFrame({"movie_title": ["Inception"], "release_year": ["2010"]})
+    }
+
+    written = transform_and_write_to_silver(config, extracted, fmt="csv", filename="data_clean")
+
+    assert written == {}
+
+    silver_contents = list(silver_root.rglob("*"))
+    assert not silver_contents, f"Expected silver layer to remain empty, found: {silver_contents}"    

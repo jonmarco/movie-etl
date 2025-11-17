@@ -3,10 +3,8 @@ import yaml
 import logging
 import pandas as pd
 from typing import Dict
-from src.utils import load_config
+from src.utils import load_config, get_last_file_path, write_dataset
 from src.extract import extract_latest_data_all_providers
-
-#TODO: NEXT STEP, WRITE IN SILVER LAYER.
 
 def apply_config_renames(provider: str, config: Dict, df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -102,14 +100,81 @@ def apply_config_casts(df: pd.DataFrame, config: Dict) -> pd.DataFrame:
     return df_casted
 
 
+def transform_and_write_to_silver(
+    config: Dict,
+    extracted_data: Dict[str, pd.DataFrame],
+    fmt: str = "parquet",
+    filename: str = "data_clean",
+) -> Dict[str, str]:
+    """
+    Transforms extracted Bronze DataFrames (rename + cast) and writes them to the Silver layer.
+
+    For each provider:
+      - Retrieves the latest partition from Bronze (using get_last_file_path)
+      - Applies renaming and type casting based on config.yaml
+      - Writes the resulting DataFrame to the Silver layer, mirroring the same date partition
+
+    Parameters
+    ----------
+    config : dict
+        Loaded configuration dictionary (must contain 'bronze_path' and 'silver_path').
+    extracted_data : dict[str, pandas.DataFrame]
+        Output from extract_latest_data_all_providers().
+    fmt : {'parquet','csv'}, default 'parquet'
+        Output format for the Silver layer.
+    filename : str, default 'data_clean'
+        Base filename for the written files.
+
+    Returns
+    -------
+    dict[str, str]
+        Dictionary mapping provider names to their written Silver file paths.
+    """
+    written_paths: Dict[str, str] = {}
+    logging.info("Silver transform stage STARTED")
+
+    for provider, df in extracted_data.items():
+        logging.info(f"Processing provider: {provider}")
+
+        base_path = os.path.join(config["bronze_path"], config["providers"][provider]["subpath"])
+
+        relative_partition_path = get_last_file_path(base_path)
+        if not relative_partition_path:
+            logging.warning(f"No Bronze partitions found for provider '{provider}', skipping.")
+            continue
+
+        df = apply_config_renames(provider, config, df)
+        df = apply_config_casts(df, config)
+
+        try:
+            out_path = write_dataset(
+                df=df,
+                config=config,
+                layer="silver",
+                provider=provider,
+                fmt=fmt,
+                filename=filename,
+                relative_partition_path=relative_partition_path,
+            )
+            written_paths[provider] = out_path
+            logging.info(f"Wrote Silver data for {provider}: {out_path}")
+        except Exception as e:
+            logging.error(f"Failed to write Silver data for {provider}: {e}")
+
+    logging.info("Silver transform stage COMPLETED")
+    return written_paths
+
 
 if __name__ == "__main__":
     config = load_config()
     extracted_data = extract_latest_data_all_providers(config)
 
+    written = transform_and_write_to_silver(config, extracted_data, fmt="parquet")
+
+    """
     for provider, df in extracted_data.items():
         print(df.head(5))
         df_renamed = apply_config_renames(provider, config, df)
         print(df_renamed.head(5))
         df_casted = apply_config_casts(df_renamed, config)
-
+    """
