@@ -45,16 +45,15 @@ def get_latest_folder(path: str, prefix: str) -> Optional[str]:
     max_number = max(numbers)
     return f"{prefix}{max_number:02d}"
 
-from pathlib import Path
-from typing import Optional
 
 def get_last_file_path(provider_path: str) -> Optional[str]:
     """
-    Returns the full path of the latest directory based on a date-structured hierarchy.
+    Returns the relative path of the latest directory based on a date-structured hierarchy.
 
     The expected directory structure is:
-    provider_path/year=YYYY/month=MM/day=DD/
-    The returned path is normalized to use '/' as the separator (POSIX format).
+        provider_path/year=YYYY/month=MM/day=DD/
+    The returned path is the concatenation of the latest year, month, and day
+    folders (e.g., "year=2025/month=11/day=17"), using POSIX separators.
 
     Parameters
     ----------
@@ -64,9 +63,8 @@ def get_last_file_path(provider_path: str) -> Optional[str]:
     Returns
     -------
     Optional[str]
-        The full path of the latest day folder according to the directory structure.
+        The relative path (year=YYYY/month=MM/day=DD) of the latest batch folder.
         Returns None if any of the year, month, or day folders are missing.
-
     """
     provider_path = Path(provider_path)
 
@@ -76,19 +74,20 @@ def get_last_file_path(provider_path: str) -> Optional[str]:
     year_folder = get_latest_folder(str(provider_path), "year=")
     if not year_folder:
         return None
-    year_path = provider_path / year_folder
 
+    year_path = provider_path / year_folder
     month_folder = get_latest_folder(str(year_path), "month=")
     if not month_folder:
         return None
-    month_path = year_path / month_folder
 
+    month_path = year_path / month_folder
     day_folder = get_latest_folder(str(month_path), "day=")
     if not day_folder:
         return None
-    day_path = month_path / day_folder
 
-    return day_path.as_posix()
+    concatenated_directory = Path(year_folder) / Path(month_folder) / Path(day_folder)
+    return concatenated_directory.as_posix()
+
 
 
 def read_csv_from_dir(directory: str) -> pd.DataFrame:
