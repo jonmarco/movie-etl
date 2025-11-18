@@ -3,13 +3,10 @@ import json
 import pytest
 import yaml
 import pandas as pd
-from src.extract import (
-    load_config,
-    extract_latest_data_all_providers
-)
+from src.extract import Extract
+
 
 class TestExtract:
-
     def test_extract_latest_data_all_providers(self, tmp_path):
         provider_dir = tmp_path / "provider1" / "year=2025" / "month=11" / "day=15"
         provider_dir.mkdir(parents=True)
@@ -18,17 +15,18 @@ class TestExtract:
         csv_file.write_text(
             "movie_id,movie_title,release_year\n"
             "1,Inception,2010\n"
-            "2,The Dark Knight,2008\n"
+            "2,The Dark Knight,2008\n",
+            encoding="utf-8",
         )
 
         config = {
             "bronze_path": str(tmp_path),
             "providers": {
                 "provider1": {"subpath": "provider1", "format": "csv", "primary_key": ["movie_id"]}
-            }
+            },
         }
 
-        data = extract_latest_data_all_providers(config)
+        data = Extract(config).extract_latest_data_all_providers()
         assert isinstance(data, dict)
         assert "provider1" in data
         df = data["provider1"]
@@ -37,15 +35,14 @@ class TestExtract:
         assert list(df.columns) == ["movie_id", "movie_title", "release_year"]
 
     def test_extract_latest_data_no_latest_folder(self, tmp_path):
-
         (tmp_path / "provider1").mkdir()
 
         config = {
             "bronze_path": str(tmp_path),
             "providers": {
                 "provider1": {"subpath": "provider1", "format": "csv", "primary_key": ["movie_id"]}
-            }
+            },
         }
-        data = extract_latest_data_all_providers(config)
 
-        assert data == {}               
+        data = Extract(config).extract_latest_data_all_providers()
+        assert data == {}           

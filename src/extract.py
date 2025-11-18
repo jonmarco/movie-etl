@@ -3,65 +3,57 @@ import yaml
 import logging
 import pandas as pd
 from typing import Dict
-from src.utils import get_last_file_path, read_data_from_bronze_dir, load_config
-
-
-def extract_latest_data_all_providers(config: Dict) -> Dict[str, pd.DataFrame]:
-    """
-    Extracts the latest data for each provider based on their latest folder.
-
-    Iterates over providers in the config, finds each provider's latest folder,
-    and reads the data into a single DataFrame per provider. Providers with no 
-    data are skipped.
-
-    Parameters
-    ----------
-    config : dict
-        Configuration dictionary with:
-            - "path": root path containing provider data
-            - "providers": dict mapping provider names to subpath, format, and primary_key
-
-    Returns
-    -------
-    dict[str, pandas.DataFrame]
-        Dictionary mapping provider names to consolidated DataFrames.
-    """
-    data = {}
-
-    logging.info("Extract stage STARTED")
-
-    for provider, info in config.get("providers", {}).items():
-        logging.info(f"Reading data from {provider}")
-        base_path = os.path.join(config["bronze_path"], info.get("subpath", ""))
-
-        relative_last_path = get_last_file_path(base_path)
-
-        if not relative_last_path:
-            logging.info(f"No latest partition found for provider '{provider}' under {base_path}. Skipping.")
-            continue
-
-        full_last_path = os.path.join(base_path, relative_last_path)
-
-        try:
-            provider_df = read_data_from_bronze_dir(
-                full_last_path,
-                info.get("format", ""),
-                info.get("primary_key", []),
-                info.get("file_level_renames", []),
-            )
-            data[provider] = provider_df
-            logging.info(f"Loaded {len(provider_df)} rows for provider {provider} from {full_last_path}")
-        except FileNotFoundError as e:
-            logging.warning(f"Skipping {provider}: {e}")
-
-    return data
+# from src.utils import get_last_file_path, read_data_from_bronze_dir, load_config
+from src.path_utils import get_last_file_path
+from src.data_utils import load_config, read_data_from_bronze_dir
 
 
 
-if __name__ == "__main__":
-    config = load_config()
-    extracted_data = extract_latest_data_all_providers(config)
+class Extract:
+    def __init__(self, config: Dict):
+        self.config = config
 
-    for provider, df in extracted_data.items():
-        print(f"{provider}: {len(df)} rows")
-        print(df.head(5))
+    def extract_latest_data_all_providers(self) -> Dict[str, pd.DataFrame]:
+        """
+        Extracts the latest data for each provider based on their latest folder.
+
+        Iterates over providers in self.config, finds each provider's latest folder,
+        and reads the data into a single DataFrame per provider. Providers with no
+        data are skipped.
+
+        Returns
+        -------
+        dict[str, pandas.DataFrame]
+            Dictionary mapping provider names to consolidated DataFrames.
+        """
+        data: Dict[str, pd.DataFrame] = {}
+
+        logging.info("Extract stage STARTED")
+
+        for provider, info in self.config.get("providers", {}).items():
+            logging.info(f"Reading data from {provider}")
+            base_path = os.path.join(self.config["bronze_path"], info.get("subpath", ""))
+
+            relative_last_path = get_last_file_path(base_path)
+            if not relative_last_path:
+                logging.info(
+                    f"No latest partition found for provider '{provider}' under {base_path}. Skipping."
+                )
+                continue
+
+            full_last_path = os.path.join(base_path, relative_last_path)
+
+            try:
+                provider_df = read_data_from_bronze_dir(
+                    full_last_path,
+                    info.get("format", ""),
+                    info.get("primary_key", []),
+                    info.get("file_level_renames", []),
+                )
+                data[provider] = provider_df
+                logging.info(f"Loaded {len(provider_df)} rows for provider {provider} from {full_last_path}")
+            except FileNotFoundError as e:
+                logging.warning(f"Skipping {provider}: {e}")
+
+        return data
+
