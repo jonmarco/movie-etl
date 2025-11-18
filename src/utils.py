@@ -350,6 +350,13 @@ def read_data_from_bronze_dir(
 
 
 
+def get_current_date_path():    
+    today = datetime.now()    
+    return today.strftime("year=%Y/month=%m/day=%d")
+
+
+
+
 def write_dataset(
     df: pd.DataFrame,
     config: Dict,

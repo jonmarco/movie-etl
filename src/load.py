@@ -3,9 +3,7 @@ import yaml
 import logging
 import pandas as pd
 from typing import Dict
-from utils import load_config, get_last_file_path, write_dataset, read_files_from_dir, merge_dataframes
-# from extract import extract_latest_data_all_providers
-# from transform import transform_and_write_to_silver
+from src.utils import load_config, get_last_file_path, write_dataset, read_files_from_dir, merge_dataframes, get_current_date_path
 
 def extract_latest_data_silver(config: Dict) -> pd.DataFrame:
     """
@@ -59,21 +57,39 @@ def extract_latest_data_silver(config: Dict) -> pd.DataFrame:
     gold_pk = config["gold_primary_key"]
     united_dataframe = merge_dataframes(df_union, merge_keys=gold_pk)
     
-
     return united_dataframe
 
+def move_to_hist(config: Dict):    
+    base_path = os.path.join(config["gold_path"])
+
+    dfs = read_files_from_dir(
+        config["gold_path"],
+        config["gold_data_format"],                
+    )
+
+    gold_df = pd.concat(dfs, ignore_index=True, sort=False)
+
+    relative_partition_path = get_current_date_path()
+
+    out_path = write_dataset(
+            df=gold_df,
+            config=config,
+            layer="hist",                
+            fmt=config["gold_data_format"],
+            filename=config["gold_filename"], 
+            relative_partition_path=relative_partition_path               
+        )
 
 if __name__ == "__main__":
     config = load_config()
-    # extracted_data = extract_latest_data_all_providers(config)
-    # written = transform_and_write_to_silver(config, extracted_data)
-    gold_df = extract_latest_data_silver(config)
-    print(gold_df.head(5))
+    # gold_df = extract_latest_data_silver(config)
+    # print(gold_df.head(5))
 
-    out_path = write_dataset(
-                df=gold_df,
-                config=config,
-                layer="gold",                
-                fmt=config["gold_data_format"],
-                filename=config["gold_filename"],                
-            )
+    # out_path = write_dataset(
+    #             df=gold_df,
+    #             config=config,
+    #             layer="gold",                
+    #             fmt=config["gold_data_format"],
+    #             filename=config["gold_filename"],                
+    #         )
+    move_to_hist(config)

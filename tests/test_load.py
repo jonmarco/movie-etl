@@ -1,7 +1,7 @@
 from pathlib import Path
 import pandas as pd
 
-from src.load import extract_latest_data_silver
+from src.load import extract_latest_data_silver, move_to_hist
 
 class TestLoad:
     def test_extract_latest_data_silver_happy_path(self, tmp_path: Path):
@@ -59,3 +59,42 @@ class TestLoad:
         df = extract_latest_data_silver(config)
         assert isinstance(df, pd.DataFrame)
         assert df.empty
+
+    def test_move_to_hist_writes_concatenated_snapshot(self, tmp_path: Path):
+        gold_root = tmp_path / "gold"
+        hist_root = tmp_path / "hist"
+        gold_root.mkdir()
+        hist_root.mkdir()
+
+        (gold_root / "gold_part1.csv").write_text(
+            "movie_title,release_year\nInception,2010\nThe Dark Knight,2008\n",
+            encoding="utf-8",
+        )
+        (gold_root / "gold_part2.csv").write_text(
+            "movie_title,release_year\nInterstellar,2014\n",
+            encoding="utf-8",
+        )
+
+        config = {
+            "gold_path": str(gold_root),
+            "gold_data_format": "csv",
+            "gold_filename": "gold_snapshot",
+            "hist_path": str(hist_root),
+        }
+
+        move_to_hist(config)
+
+        written_files = list(hist_root.rglob("gold_snapshot.csv"))
+        assert len(written_files) == 1
+        out_path = written_files[0]
+        assert out_path.exists()
+
+        df = pd.read_csv(out_path)
+        assert len(df) == 3
+        assert {"movie_title", "release_year"}.issubset(df.columns)
+        assert set(df["movie_title"].tolist()) == {"Inception", "The Dark Knight", "Interstellar"}
+
+
+
+
+
