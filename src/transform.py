@@ -3,26 +3,14 @@ import logging
 from typing import Dict
 import pandas as pd
 
-from src.utils import get_last_file_path, write_dataset
-
+# from src.utils import get_last_file_path, write_dataset
+from src.data_utils import write_dataset
+from src.path_utils import get_last_file_path
 
 class Transform:
-    """
-    Aplica renombrados y casteos según config.yaml y escribe los resultados en la capa Silver.
-    """
 
     def __init__(self, config: Dict):
-        """
-        Parameters
-        ----------
-        config : dict
-            Debe incluir:
-              - "bronze_path"
-              - "silver_path"
-              - "silver_data_format"  ('parquet' | 'csv')
-              - "providers" (con 'subpath', 'format', 'primary_key', 'mapping' opcional)
-              - "casts" (sección global de tipados)
-        """
+
         self.config = config
 
     def apply_config_renames(self, provider: str, df: pd.DataFrame) -> pd.DataFrame:
@@ -87,7 +75,7 @@ class Transform:
 
     def _transform_provider_df(self, provider: str, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Renames + casts para un provider.
+        Renames + casts for a provider.
         """
         df = self.apply_config_renames(provider, df)
         df = self.apply_config_casts(df)

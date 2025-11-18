@@ -2,7 +2,7 @@ import logging
 import argparse
 import pandas as pd
 
-from src.utils import load_config, write_dataset
+from src.data_utils import load_config, write_dataset
 from src.extract import Extract
 from src.transform import Transform
 from src.load import Load
@@ -19,7 +19,7 @@ def main():
     loader = Load(config)
     
     move_to_hist_flag = str(config.get("move_to_hist", "false")).lower() in ["true", "1", "yes"]
-    
+
     if move_to_hist_flag:
         logging.info("[ETL] Moving current Gold snapshot to Hist layer")
         loader.move_to_hist()

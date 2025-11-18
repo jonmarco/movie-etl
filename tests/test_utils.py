@@ -3,14 +3,9 @@ import json
 import pytest
 import pandas as pd
 import yaml
-from src.utils import (
-    load_config,
-    get_latest_folder,
-    get_last_file_path,
-    read_csv_from_dir,
-    read_json_from_dir,
-    read_data_from_bronze_dir
-)
+from src.data_utils import load_config, read_files_from_dir,read_data_from_bronze_dir
+from src.path_utils import get_latest_folder, get_last_file_path
+
 
 class TestUtils:
 
@@ -59,46 +54,6 @@ class TestUtils:
         assert last_path.endswith("year=2023/month=05/day=10")
         assert "/" in last_path  
 
-
-    def test_read_csv_from_dir_ok(self, tmp_path):
-        f1 = tmp_path / "provider1_movie_data1.csv"
-        f2 = tmp_path / "provider1_movie_data2.csv"
-
-        f1.write_text("movie_title,release_year,critic_score_percentage\nInception,2010,87\nThe Dark Knight,2008,94")
-        f2.write_text("movie_title,release_year,critic_score_percentage\nParasite,2019,99")
-
-        df = read_csv_from_dir(str(tmp_path))
-
-        assert len(df) == 3
-        assert list(df.columns) == ["movie_title","release_year","critic_score_percentage"]
-
-    def test_read_csv_from_dir_missing_dir(self):
-        with pytest.raises(FileNotFoundError):
-            read_csv_from_dir("no_such_directory")
-
-    def test_read_csv_from_dir_no_files(self, tmp_path):
-        with pytest.raises(FileNotFoundError):
-            read_csv_from_dir(str(tmp_path))
-
-
-    def test_read_json_from_dir_ok(self, tmp_path):
-        f1 = tmp_path / "provider2_movie_data1.json"
-
-        f1.write_text(json.dumps([{"title": "Inception", "year": "2010", "audience_average_score": 9.1 }, 
-            {"title": "The Dark Knight", "year": "2008", "audience_average_score": 9.4}]))        
-
-        df = read_json_from_dir(str(tmp_path))
-
-        assert len(df) == 2
-        assert list(df.columns) == ["title","year","audience_average_score"]
-
-    def test_read_json_from_dir_missing_dir(self):
-        with pytest.raises(FileNotFoundError):
-            read_json_from_dir("no_such_directory")
-
-    def test_read_json_from_dir_no_files(self, tmp_path):
-        with pytest.raises(FileNotFoundError):
-            read_json_from_dir(str(tmp_path))
 
     def test_read_data_from_bronze_dir_csv_only(self, tmp_path):
         # Create CSV file

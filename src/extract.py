@@ -3,7 +3,11 @@ import yaml
 import logging
 import pandas as pd
 from typing import Dict
-from src.utils import get_last_file_path, read_data_from_bronze_dir, load_config
+# from src.utils import get_last_file_path, read_data_from_bronze_dir, load_config
+from src.path_utils import get_last_file_path
+from src.data_utils import load_config, read_data_from_bronze_dir
+
+
 
 class Extract:
     def __init__(self, config: Dict):
@@ -53,12 +57,3 @@ class Extract:
 
         return data
 
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    config = load_config()
-    extracted_data = Extract(config).extract_latest_data_all_providers()
-
-    for provider, df in extracted_data.items():
-        print(f"{provider}: {len(df)} rows")
-        print(df.head(5))

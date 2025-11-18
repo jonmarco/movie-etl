@@ -3,14 +3,8 @@ import logging
 from typing import Dict, List, Optional
 import pandas as pd
 
-from src.utils import (
-    load_config,
-    get_last_file_path,
-    write_dataset,
-    read_files_from_dir,
-    merge_dataframes,
-    get_current_date_path,
-)
+from src.data_utils import write_dataset, read_files_from_dir, merge_dataframes
+from src.path_utils import get_last_file_path, get_current_date_path
 
 class Load:
 
@@ -108,18 +102,3 @@ class Load:
 
         logging.info(f"[hist] Snapshot written to {out_path}")
         return out_path
-
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    cfg = load_config()
-    loader = Load(cfg)
-
-    # Example: Build Gold dataset in memory
-    gold_df = loader.build_gold_from_silver()
-    print(gold_df.head(5))
-
-    # Example: Move current Gold data to Hist
-    # out_path = loader.move_to_hist()
-    # print(out_path)
