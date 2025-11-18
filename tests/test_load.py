@@ -1,10 +1,10 @@
 from pathlib import Path
 import pandas as pd
+from src.load import Load
 
-from src.load import extract_latest_data_silver, move_to_hist
 
 class TestLoad:
-    def test_extract_latest_data_silver_happy_path(self, tmp_path: Path):
+    def test_build_gold_from_silver_happy_path(self, tmp_path: Path):
         silver_root = tmp_path / "silver"
         silver_root.mkdir()
 
@@ -34,15 +34,19 @@ class TestLoad:
                 "provider2": {"subpath": "provider2", "format": "csv", "primary_key": ["movie_title", "release_year"]},
             },
             "gold_primary_key": ["movie_title", "release_year"],
+            "gold_path": str(tmp_path / "gold"),
+            "gold_data_format": "csv",
+            "gold_filename": "gold_snapshot",
+            "hist_path": str(tmp_path / "hist"),
         }
 
-        df = extract_latest_data_silver(config)
+        df = Load(config).build_gold_from_silver()
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 3
         assert {"movie_title", "release_year"}.issubset(df.columns)
         assert {"Inception", "The Dark Knight", "Interstellar"} == set(df["movie_title"].tolist())
 
-    def test_extract_latest_data_silver_no_partitions(self, tmp_path: Path):
+    def test_build_gold_from_silver_no_partitions(self, tmp_path: Path):
         silver_root = tmp_path / "silver"
         silver_root.mkdir()
         (silver_root / "provider1").mkdir()
@@ -54,9 +58,13 @@ class TestLoad:
                 "provider1": {"subpath": "provider1", "format": "csv", "primary_key": ["movie_title", "release_year"]},
             },
             "gold_primary_key": ["movie_title", "release_year"],
+            "gold_path": str(tmp_path / "gold"),
+            "gold_data_format": "csv",
+            "gold_filename": "gold_snapshot",
+            "hist_path": str(tmp_path / "hist"),
         }
 
-        df = extract_latest_data_silver(config)
+        df = Load(config).build_gold_from_silver()
         assert isinstance(df, pd.DataFrame)
         assert df.empty
 
@@ -80,21 +88,21 @@ class TestLoad:
             "gold_data_format": "csv",
             "gold_filename": "gold_snapshot",
             "hist_path": str(hist_root),
+            "silver_path": str(tmp_path / "silver"),
+            "silver_data_format": "csv",
+            "providers": {},
+            "gold_primary_key": ["movie_title", "release_year"],
         }
 
-        move_to_hist(config)
+        out_path = Load(config).move_to_hist()
+        assert out_path.endswith("gold_snapshot.csv")
 
         written_files = list(hist_root.rglob("gold_snapshot.csv"))
         assert len(written_files) == 1
-        out_path = written_files[0]
-        assert out_path.exists()
+        out = written_files[0]
+        assert out.exists()
 
-        df = pd.read_csv(out_path)
+        df = pd.read_csv(out)
         assert len(df) == 3
         assert {"movie_title", "release_year"}.issubset(df.columns)
         assert set(df["movie_title"].tolist()) == {"Inception", "The Dark Knight", "Interstellar"}
-
-
-
-
-

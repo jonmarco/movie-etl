@@ -1,95 +1,108 @@
 import os
-import yaml
 import logging
+from typing import Dict, List
 import pandas as pd
-from typing import Dict
-from src.utils import load_config, get_last_file_path, write_dataset, read_files_from_dir, merge_dataframes, get_current_date_path
 
-def extract_latest_data_silver(config: Dict) -> pd.DataFrame:
-    """
-    Extracts the latest data for each provider based on their latest folder.
+from src.utils import (
+    load_config,
+    get_last_file_path,
+    write_dataset,
+    read_files_from_dir,
+    merge_dataframes,
+    get_current_date_path,
+)
 
-    Iterates over providers in the config, finds each provider's latest folder,
-    and reads the data into a single DataFrame per provider. Providers with no 
-    data are skipped.
 
-    Parameters
-    ----------
-    config : dict
-        Configuration dictionary with:
-            - "path": root path containing provider data
-            - "providers": dict mapping provider names to subpath, format, and primary_key
+class Load:
 
-    Returns
-    -------
-    dict[str, pandas.DataFrame]
-        Dictionary mapping provider names to consolidated DataFrames.
-    """
-    data = {}
+    def __init__(self, config: Dict):
+        self.config = config
 
-    logging.info("Load stage STARTED")
+    def build_gold_from_silver(self) -> pd.DataFrame:
+        """
+        Reads the latest Silver partitions for each provider,
+        concatenates all of them, and merges by the global gold_primary_key.
 
-    df_union: List[pd.DataFrame] = []
+        Returns
+        -------
+        pandas.DataFrame
+            Unified DataFrame across all providers based on gold_primary_key.
+        """
+        
+        if "gold_primary_key" not in self.config or not self.config["gold_primary_key"]:
+            raise KeyError("Config must include a non-empty 'gold_primary_key' list.")
 
-    for provider, info in config.get("providers", {}).items():
-        logging.info(f"Reading data from {provider}")
-        base_path = os.path.join(config["silver_path"], info.get("subpath", ""))
+        logging.info("Load stage STARTED (reading from SILVER)")
+        df_union: List[pd.DataFrame] = []
 
-        relative_last_path = get_last_file_path(base_path)
+        for provider, info in self.config.get("providers", {}).items():
+            logging.info(f"[silver] Reading data from {provider}")
 
-        if not relative_last_path:
-            logging.info(f"No latest partition found for provider '{provider}' under {base_path}. Skipping.")
-            continue
+            base_path = os.path.join(self.config["silver_path"], info.get("subpath", ""))
+            relative_last_path = get_last_file_path(base_path)
+            if not relative_last_path:
+                logging.info(
+                    f"[silver] No latest partition found for '{provider}' under {base_path}. Skipping."
+                )
+                continue
 
-        full_last_path = os.path.join(base_path, relative_last_path)
+            full_last_path = os.path.join(base_path, relative_last_path)
 
-        try:
-            dfs = read_files_from_dir(
-                full_last_path,
-                config["silver_data_format"],                
-            )
-            provider_df = pd.concat(dfs, ignore_index=True, sort=False)
-            df_union.append(provider_df)
-            logging.info(f"Loaded {len(provider_df)} rows for provider {provider} from {full_last_path}")
-        except FileNotFoundError as e:
-            logging.warning(f"Skipping {provider}: {e}")
+            try:
+                dfs = read_files_from_dir(
+                    directory=full_last_path,
+                    extension=self.config.get("silver_data_format", ""),
+                )
+                provider_df = pd.concat(dfs, ignore_index=True, sort=False)
+                df_union.append(provider_df)
+                logging.info(f"[silver] Loaded {len(provider_df)} rows for {provider} from {full_last_path}")
+            except FileNotFoundError as e:
+                logging.warning(f"[silver] Skipping {provider}: {e}")
 
-    gold_pk = config["gold_primary_key"]
-    united_dataframe = merge_dataframes(df_union, merge_keys=gold_pk)
-    
-    return united_dataframe
+        gold_pk = self.config["gold_primary_key"]
+        united_dataframe = merge_dataframes(df_union, merge_keys=gold_pk)
+        logging.info(f"[silver] Unified dataframe built with {len(united_dataframe)} rows using PK {gold_pk}")
+        return united_dataframe
 
-def move_to_hist(config: Dict):    
-    base_path = os.path.join(config["gold_path"])
+    def move_to_hist(self) -> str:
+        """
+        Concatenates the current Gold dataset and writes a dated snapshot to Hist.
 
-    dfs = read_files_from_dir(
-        config["gold_path"],
-        config["gold_data_format"],                
-    )
+        Returns
+        -------
+        str
+            Full path of the written file in the Hist layer.
+        """
+        gold_path = self.config["gold_path"]
 
-    gold_df = pd.concat(dfs, ignore_index=True, sort=False)
-
-    relative_partition_path = get_current_date_path()
-
-    out_path = write_dataset(
-            df=gold_df,
-            config=config,
-            layer="hist",                
-            fmt=config["gold_data_format"],
-            filename=config["gold_filename"], 
-            relative_partition_path=relative_partition_path               
+        dfs = read_files_from_dir(
+            directory=gold_path,
+            extension=self.config.get("gold_data_format", "csv"),
         )
+        gold_df = pd.concat(dfs, ignore_index=True, sort=False)
+
+        relative_partition_path = get_current_date_path()  # e.g., "year=2025/month=11/day=18"
+        out_path = write_dataset(
+            df=gold_df,
+            config=self.config,
+            layer="hist",
+            fmt=self.config.get("gold_data_format", "csv"),
+            filename=self.config.get("gold_filename", "gold_snapshot"),
+            relative_partition_path=relative_partition_path,
+        )
+        logging.info(f"[hist] Snapshot written to {out_path}")
+        return out_path
+
 
 if __name__ == "__main__":
-    config = load_config()
-    # gold_df = extract_latest_data_silver(config)
-    # print(gold_df.head(5))
+    logging.basicConfig(level=logging.INFO)
+    cfg = load_config()
+    loader = Load(cfg)
 
-    # out_path = write_dataset(
-    #             df=gold_df,
-    #             config=config,
-    #             layer="gold",                
-    #             fmt=config["gold_data_format"],
-    #             filename=config["gold_filename"],                
-    #         )
-    move_to_hist(config)
+    # Example: Build Gold dataset in memory
+    gold_df = loader.build_gold_from_silver()
+    print(gold_df.head(5))
+
+    # Example: Move current Gold data to Hist
+    # out_path = loader.move_to_hist()
+    # print(out_path)
