@@ -4,10 +4,10 @@ import pytest
 import numpy as np
 from pathlib import Path
 
-from src.transform import apply_config_renames, apply_config_casts, transform_and_write_to_silver
+from src.transform import Transform
+
 
 def test_apply_config_renames_basic():
-
     provider = "provider1"
     config = {
         "providers": {
@@ -15,7 +15,7 @@ def test_apply_config_renames_basic():
                 "mapping": {
                     "movie_title": "movie_title",
                     "release_year": "release_year",
-                    "critic_score_percentage": "critic_score_RENAMED",  # rename to new name
+                    "critic_score_percentage": "critic_score_RENAMED",
                 }
             }
         }
@@ -28,19 +28,17 @@ def test_apply_config_renames_basic():
         }
     )
 
-    df_out = apply_config_renames(provider, config, df_in)
+    df_out = Transform(config).apply_config_renames(provider, df_in)
 
     assert "movie_title" in df_out.columns
     assert "release_year" in df_out.columns
-    assert "critic_score_RENAMED" in df_out.columns  
+    assert "critic_score_RENAMED" in df_out.columns
     assert "critic_score_percentage" not in df_out.columns
-
     assert df_out.loc[0, "critic_score_RENAMED"] == 87
     assert df_out.loc[1, "critic_score_RENAMED"] == 94
 
 
 def test_apply_config_renames_strips_and_warns_missing(caplog):
-
     provider = "provider3"
     config = {
         "providers": {
@@ -58,11 +56,11 @@ def test_apply_config_renames_strips_and_warns_missing(caplog):
         {
             "film_name": ["Inception", "The Dark Knight"],
             " year ": [2010, 2008],
-            "box_office_gross_usd ": [292576195, 533345358],            
+            "box_office_gross_usd ": [292576195, 533345358],
         }
     )
 
-    df_out = apply_config_renames(provider, config, df_in)
+    df_out = Transform(config).apply_config_renames(provider, df_in)
 
     assert "domestic_box_office_usd" in df_out.columns
     assert "release_year" in df_out.columns
@@ -73,7 +71,6 @@ def test_apply_config_renames_strips_and_warns_missing(caplog):
 
 
 def test_apply_config_casts_basic_types():
-    
     config = {
         "casts": {
             "movie_title": "string",
@@ -87,34 +84,31 @@ def test_apply_config_casts_basic_types():
     df_in = pd.DataFrame(
         {
             "movie_title": ["Inception", "The Dark Knight"],
-            "release_year": ["2010", "2008"],            
-            "critic_score_percentage": ["87", "94.0"],   
+            "release_year": ["2010", "2008"],
+            "critic_score_percentage": ["87", "94.0"],
             "total_audience_ratings": ["1500000", "2200000"],
         }
     )
 
     dtypes_before = df_in.dtypes.copy()
 
-    df_out = apply_config_casts(df_in, config)
+    df_out = Transform(config).apply_config_casts(df_in)
 
     assert str(df_out["movie_title"].dtype) == "string"
     assert str(df_out["release_year"].dtype) == "Int64"
     assert str(df_out["total_audience_ratings"].dtype) == "Int64"
     assert str(df_out["critic_score_percentage"].dtype) == "float64"
-
     assert df_out.loc[0, "release_year"] == 2010
     assert df_out.loc[1, "release_year"] == 2008
     assert df_out.loc[0, "critic_score_percentage"] == 87.0
     assert df_out.loc[1, "critic_score_percentage"] == 94.0
     assert df_out.loc[0, "total_audience_ratings"] == 1500000
     assert df_out.loc[1, "total_audience_ratings"] == 2200000
-
     assert "international_box_office_usd" not in df_out.columns
     assert all(df_in.dtypes == dtypes_before)
 
 
 def test_apply_config_casts_missing_and_invalid_values():
-
     config = {
         "casts": {
             "movie_title": "string",
@@ -126,32 +120,29 @@ def test_apply_config_casts_missing_and_invalid_values():
 
     df_in = pd.DataFrame(
         {
-            "movie_title": ["Parasite", None],  
-            "release_year": ["2019", ""],       
-            "domestic_box_office_usd": ["53369749", "not_a_number"],  
-            "audience_average_score": ["9.0", "bad"],                 
+            "movie_title": ["Parasite", None],
+            "release_year": ["2019", ""],
+            "domestic_box_office_usd": ["53369749", "not_a_number"],
+            "audience_average_score": ["9.0", "bad"],
         }
     )
 
-    df_out = apply_config_casts(df_in, config)
+    df_out = Transform(config).apply_config_casts(df_in)
 
     assert str(df_out["movie_title"].dtype) == "string"
     assert str(df_out["release_year"].dtype) == "Int64"
     assert str(df_out["domestic_box_office_usd"].dtype) == "Int64"
     assert str(df_out["audience_average_score"].dtype) == "float64"
-
-    # Then: values & coercion
     assert df_out.loc[0, "release_year"] == 2019
-    assert pd.isna(df_out.loc[1, "release_year"])  # <NA>
-
+    assert pd.isna(df_out.loc[1, "release_year"])
     assert df_out.loc[0, "domestic_box_office_usd"] == 53369749
-    assert pd.isna(df_out.loc[1, "domestic_box_office_usd"])  # <NA>
-
+    assert pd.isna(df_out.loc[1, "domestic_box_office_usd"])
     assert df_out.loc[0, "audience_average_score"] == 9.0
-    assert np.isnan(df_out.loc[1, "audience_average_score"])  #  NaN
+    assert np.isnan(df_out.loc[1, "audience_average_score"])
 
 
 def test_transform_and_write_to_silver(tmp_path: Path):
+    from src.transform import Transform
     bronze_root = tmp_path / "bronze"
     silver_root = tmp_path / "silver"
     bronze_root.mkdir()
@@ -178,7 +169,7 @@ def test_transform_and_write_to_silver(tmp_path: Path):
         "provider1": pd.DataFrame({"movie_title": ["Inception"], "release_year": ["2010"]})
     }
 
-    written = transform_and_write_to_silver(config, extracted, filename="data_clean")
+    written = Transform(config).transform_and_write_to_silver(extracted, filename="data_clean")
 
     assert "provider1" in written
     out_path = Path(written["provider1"])
@@ -190,8 +181,8 @@ def test_transform_and_write_to_silver(tmp_path: Path):
     assert len(df_written) == 1
     assert set(df_written.columns) >= {"movie_title", "release_year"}
 
-def test_transform_and_write_to_silver_no_bronze_path(tmp_path: Path):
 
+def test_transform_and_write_to_silver_no_bronze_path(tmp_path: Path):
     bronze_root = tmp_path / "bronze"
     silver_root = tmp_path / "silver"
     bronze_root.mkdir()
@@ -202,6 +193,7 @@ def test_transform_and_write_to_silver_no_bronze_path(tmp_path: Path):
     config = {
         "bronze_path": str(bronze_root),
         "silver_path": str(silver_root),
+        "silver_data_format": "csv",
         "providers": {
             "provider1": {"subpath": "provider1", "format": "csv", "primary_key": ["movie_title", "release_year"]}
         },
@@ -211,9 +203,8 @@ def test_transform_and_write_to_silver_no_bronze_path(tmp_path: Path):
         "provider1": pd.DataFrame({"movie_title": ["Inception"], "release_year": ["2010"]})
     }
 
-    written = transform_and_write_to_silver(config, extracted, filename="data_clean")
+    written = Transform(config).transform_and_write_to_silver(extracted, filename="data_clean")
 
     assert written == {}
-
     silver_contents = list(silver_root.rglob("*"))
-    assert not silver_contents, f"Expected silver layer to remain empty, found: {silver_contents}"    
+    assert not silver_contents, f"Expected silver layer to remain empty, found: {silver_contents}"
