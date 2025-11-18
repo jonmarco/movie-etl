@@ -153,7 +153,6 @@ def test_apply_config_casts_missing_and_invalid_values():
 
 
 def test_transform_and_write_to_silver(tmp_path: Path):
-
     bronze_root = tmp_path / "bronze"
     silver_root = tmp_path / "silver"
     bronze_root.mkdir()
@@ -165,8 +164,13 @@ def test_transform_and_write_to_silver(tmp_path: Path):
     config = {
         "bronze_path": str(bronze_root),
         "silver_path": str(silver_root),
+        "silver_data_format": "csv",
         "providers": {
-            "provider1": {"subpath": "provider1", "format": "csv", "primary_key": ["movie_title", "release_year"]}
+            "provider1": {
+                "subpath": "provider1",
+                "format": "csv",
+                "primary_key": ["movie_title", "release_year"],
+            }
         },
         "casts": {"release_year": "int", "movie_title": "string"},
     }
@@ -175,20 +179,17 @@ def test_transform_and_write_to_silver(tmp_path: Path):
         "provider1": pd.DataFrame({"movie_title": ["Inception"], "release_year": ["2010"]})
     }
 
-    written = transform_and_write_to_silver(config, extracted, fmt="csv", filename="data_clean")
+    written = transform_and_write_to_silver(config, extracted, filename="data_clean")
 
     assert "provider1" in written
     out_path = Path(written["provider1"])
     assert out_path.name == "data_clean.csv"
-
-    expected_dir = silver_root / "year=2025" / "month=11" / "day=17" / "provider1"
+    expected_dir = silver_root / "provider1" / "year=2025" / "month=11" / "day=17"
     assert out_path.parent == expected_dir
-
     assert out_path.exists()
     df_written = pd.read_csv(out_path)
     assert len(df_written) == 1
     assert set(df_written.columns) >= {"movie_title", "release_year"}
-
 
 def test_transform_and_write_to_silver_no_bronze_path(tmp_path: Path):
 
@@ -211,7 +212,7 @@ def test_transform_and_write_to_silver_no_bronze_path(tmp_path: Path):
         "provider1": pd.DataFrame({"movie_title": ["Inception"], "release_year": ["2010"]})
     }
 
-    written = transform_and_write_to_silver(config, extracted, fmt="csv", filename="data_clean")
+    written = transform_and_write_to_silver(config, extracted, filename="data_clean")
 
     assert written == {}
 
