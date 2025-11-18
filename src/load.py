@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 import pandas as pd
 
 from src.utils import (
@@ -11,7 +11,6 @@ from src.utils import (
     merge_dataframes,
     get_current_date_path,
 )
-
 
 class Load:
 
@@ -28,7 +27,7 @@ class Load:
         pandas.DataFrame
             Unified DataFrame across all providers based on gold_primary_key.
         """
-        
+
         if "gold_primary_key" not in self.config or not self.config["gold_primary_key"]:
             raise KeyError("Config must include a non-empty 'gold_primary_key' list.")
 
@@ -64,22 +63,38 @@ class Load:
         logging.info(f"[silver] Unified dataframe built with {len(united_dataframe)} rows using PK {gold_pk}")
         return united_dataframe
 
-    def move_to_hist(self) -> str:
+
+    def move_to_hist(self) -> Optional[str]:
         """
         Concatenates the current Gold dataset and writes a dated snapshot to Hist.
 
+        If no Gold files exist, logs a warning and skips the write.
+
         Returns
         -------
-        str
-            Full path of the written file in the Hist layer.
+        str | None
+            Full path of the written file in the Hist layer,
+            or None if no Gold files were found.
         """
         gold_path = self.config["gold_path"]
 
-        dfs = read_files_from_dir(
-            directory=gold_path,
-            extension=self.config.get("gold_data_format", "csv"),
-        )
+        try:
+            dfs = read_files_from_dir(
+                directory=gold_path,
+                extension=self.config.get("gold_data_format", "csv"),
+            )
+        except FileNotFoundError:
+            logging.warning(f"[hist] No Gold files found under {gold_path}. Skipping move_to_hist.")
+            return None
+
+        if not dfs:
+            logging.warning(f"[hist] No Gold data found in {gold_path}. Skipping move_to_hist.")
+            return None
+
         gold_df = pd.concat(dfs, ignore_index=True, sort=False)
+        if gold_df.empty:
+            logging.warning(f"[hist] Gold DataFrame is empty. Nothing to write to Hist.")
+            return None
 
         relative_partition_path = get_current_date_path()  # e.g., "year=2025/month=11/day=18"
         out_path = write_dataset(
@@ -90,8 +105,10 @@ class Load:
             filename=self.config.get("gold_filename", "gold_snapshot"),
             relative_partition_path=relative_partition_path,
         )
+
         logging.info(f"[hist] Snapshot written to {out_path}")
         return out_path
+
 
 
 if __name__ == "__main__":
