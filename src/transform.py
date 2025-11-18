@@ -4,7 +4,6 @@ import logging
 import pandas as pd
 from typing import Dict
 from src.utils import load_config, get_last_file_path, write_dataset
-from src.extract import extract_latest_data_all_providers
 
 def apply_config_renames(provider: str, config: Dict, df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -165,11 +164,12 @@ def transform_and_write_to_silver(
 
 
 if __name__ == "__main__":
+    """
     config = load_config()
     extracted_data = extract_latest_data_all_providers(config)
     written = transform_and_write_to_silver(config, extracted_data)
 
-    """
+    
     for provider, df in extracted_data.items():
         print(df.head(5))
         df_renamed = apply_config_renames(provider, config, df)
