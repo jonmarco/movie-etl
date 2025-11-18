@@ -90,7 +90,7 @@ class Load:
             logging.warning(f"[hist] Gold DataFrame is empty. Nothing to write to Hist.")
             return None
 
-        relative_partition_path = get_current_date_path()  # e.g., "year=2025/month=11/day=18"
+        relative_partition_path = get_current_date_path()  
         out_path = write_dataset(
             df=gold_df,
             config=self.config,

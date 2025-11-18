@@ -140,10 +140,11 @@ def write_dataset(
 
     base_path = config[layer_key]
     parts: List[str] = [base_path]
+    if provider:
+        parts.append(provider)    
     if relative_partition_path:
         parts.append(relative_partition_path)
-    if provider:
-        parts.append(provider)
+
 
     out_dir = os.path.join(*parts)
     os.makedirs(out_dir, exist_ok=True)

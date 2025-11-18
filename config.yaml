@@ -66,6 +66,7 @@ casts:
   marketing_spend_usd: int
 
 silver_data_format: "parquet"
+overwrite_silver: "false"
 gold_data_format: "parquet"
 gold_primary_key: ["movie_title", "release_year"]
 gold_filename: "movies"

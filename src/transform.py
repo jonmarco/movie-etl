@@ -3,7 +3,7 @@ import logging
 from typing import Dict
 import pandas as pd
 
-# from src.utils import get_last_file_path, write_dataset
+from pathlib import Path
 from src.data_utils import write_dataset
 from src.path_utils import get_last_file_path
 
@@ -103,6 +103,9 @@ class Transform:
         written_paths: Dict[str, str] = {}
         logging.info("Silver transform stage STARTED")
 
+        overwrite_flag = str(self.config.get("overwrite_silver", "false")).lower() in ("true", "1", "yes")
+
+
         for provider, df in extracted_data.items():
             logging.info(f"Processing provider: {provider}")
 
@@ -114,13 +117,28 @@ class Transform:
 
             df_out = self._transform_provider_df(provider, df)
 
+            fmt = self.config.get("silver_data_format", "csv").lower()
+            ext = ".parquet" if fmt == "parquet" else ".csv"
+
+            silver_base = Path(self.config["silver_path"])
+            rel_parts = relative_partition_path.split("/")
+            out_dir = silver_base.joinpath(provider,*rel_parts)
+            out_dir.mkdir(parents=True, exist_ok=True)
+
+            out_path = out_dir / f"{filename}{ext}"
+
+            if os.path.exists(out_path) and not overwrite_flag:
+¡               logging.info(f"[SKIP] Silver file already exists for provider '{provider}': {out_path}")
+                written_paths[provider] = out_path
+                continue
+
             try:
                 out_path = write_dataset(
                     df=df_out,
                     config=self.config,
                     layer="silver",
                     provider=provider,
-                    fmt=self.config["silver_data_format"],
+                    fmt=fmt,
                     filename=filename,
                     relative_partition_path=relative_partition_path,
                 )
