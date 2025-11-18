@@ -174,7 +174,7 @@ def test_transform_and_write_to_silver(tmp_path: Path):
     assert "provider1" in written
     out_path = Path(written["provider1"])
     assert out_path.name == "data_clean.csv"
-    expected_dir = silver_root  / "year=2025" / "month=11" / "day=17" / "provider1"
+    expected_dir = silver_root / "provider1" / "year=2025" / "month=11" / "day=17" 
     assert out_path.parent == expected_dir
     assert out_path.exists()
     df_written = pd.read_csv(out_path)
