@@ -128,7 +128,7 @@ class Transform:
             out_path = out_dir / f"{filename}{ext}"
 
             if os.path.exists(out_path) and not overwrite_flag:
-¡               logging.info(f"[SKIP] Silver file already exists for provider '{provider}': {out_path}")
+                logging.info(f"[SKIP] Silver file already exists for provider '{provider}': {out_path}")
                 written_paths[provider] = out_path
                 continue
 
