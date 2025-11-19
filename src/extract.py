@@ -3,7 +3,6 @@ import yaml
 import logging
 import pandas as pd
 from typing import Dict
-# from src.utils import get_last_file_path, read_data_from_bronze_dir, load_config
 from src.path_utils import get_last_file_path
 from src.data_utils import load_config, read_data_from_bronze_dir
 
@@ -28,10 +27,7 @@ class Extract:
         """
         data: Dict[str, pd.DataFrame] = {}
 
-        logging.info("Extract stage STARTED")
-
         for provider, info in self.config.get("providers", {}).items():
-            logging.info(f"Reading data from {provider}")
             base_path = os.path.join(self.config["bronze_path"], info.get("subpath", ""))
 
             relative_last_path = get_last_file_path(base_path)
@@ -50,8 +46,7 @@ class Extract:
                     info.get("primary_key", []),
                     info.get("file_level_renames", []),
                 )
-                data[provider] = provider_df
-                logging.info(f"Loaded {len(provider_df)} rows for provider {provider} from {full_last_path}")
+                data[provider] = provider_df                
             except FileNotFoundError as e:
                 logging.warning(f"Skipping {provider}: {e}")
 
