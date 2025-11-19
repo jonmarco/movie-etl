@@ -8,7 +8,6 @@ hist_path: "data/hist/"
 providers:
   provider1:
     subpath: "provider1/"
-    periodicity: "weekly"
     format: "csv"
     primary_key: ["movie_title","release_year"]
     mapping:
@@ -20,7 +19,6 @@ providers:
 
   provider2:
     subpath: "provider2/"
-    periodicity: "twice_a_month"
     format: "json"
     primary_key: ["title","year"]
     mapping:
@@ -32,7 +30,6 @@ providers:
 
   provider3:
     subpath: "provider3/"
-    periodicity: "monthly"
     format: "csv"
     primary_key: ["film_name","year_of_release"]
     mapping:
