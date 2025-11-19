@@ -36,7 +36,6 @@ class Transform:
 
         if valid_mapping:
             df = df.rename(columns=valid_mapping)
-            logging.info(f"[{provider}] Applied rename to {len(valid_mapping)} columns.")
         else:
             logging.info(f"[{provider}] No valid columns to rename found in mapping.")
 
@@ -101,7 +100,6 @@ class Transform:
             Dictionary mapping provider names to their written Silver file paths.
         """
         written_paths: Dict[str, str] = {}
-        logging.info("Silver transform stage STARTED")
 
         overwrite_flag = str(self.config.get("overwrite_silver", "false")).lower() in ("true", "1", "yes")
 
@@ -147,5 +145,4 @@ class Transform:
             except Exception as e:
                 logging.error(f"Failed to write Silver data for {provider}: {e}")
 
-        logging.info("Silver transform stage COMPLETED")
         return written_paths

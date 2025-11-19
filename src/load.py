@@ -29,7 +29,6 @@ class Load:
         df_union: List[pd.DataFrame] = []
 
         for provider, info in self.config.get("providers", {}).items():
-            logging.info(f"[silver] Reading data from {provider}")
 
             base_path = os.path.join(self.config["silver_path"], info.get("subpath", ""))
             relative_last_path = get_last_file_path(base_path)
@@ -48,13 +47,12 @@ class Load:
                 )
                 provider_df = pd.concat(dfs, ignore_index=True, sort=False)
                 df_union.append(provider_df)
-                logging.info(f"[silver] Loaded {len(provider_df)} rows for {provider} from {full_last_path}")
             except FileNotFoundError as e:
                 logging.warning(f"[silver] Skipping {provider}: {e}")
 
         gold_pk = self.config["gold_primary_key"]
         united_dataframe = merge_dataframes(df_union, merge_keys=gold_pk)
-        logging.info(f"[silver] Unified dataframe built with {len(united_dataframe)} rows using PK {gold_pk}")
+        logging.info(f"[gold] Unified dataframe built with {len(united_dataframe)} rows using PK {gold_pk}")
         return united_dataframe
 
 
