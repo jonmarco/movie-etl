@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional
-
+import os
+from typing import Tuple
 
 def get_latest_folder(base: str, prefix: str) -> Optional[str]:
     """
@@ -54,3 +55,18 @@ def get_current_date_path() -> str:
     from datetime import datetime
     now = datetime.now()
     return f"year={now.year}/month={now:%m}/day={now:%d}"
+
+
+def resolve_partition(config: dict, provider: str) -> str:
+    base_path = os.path.join(config["bronze_path"], config["providers"][provider]["subpath"])
+    return get_last_file_path(base_path)
+
+
+def prepare_output_dir(config: dict, provider: str, relative_partition_path: str, filename: str, fmt: str):
+    silver_base = Path(config["silver_path"])
+    rel_parts = relative_partition_path.split("/")
+    out_dir = silver_base.joinpath(provider, *rel_parts)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ext = ".parquet" if fmt == "parquet" else ".csv"
+    out_path = out_dir / f"{filename}{ext}"
+    return out_dir, out_path

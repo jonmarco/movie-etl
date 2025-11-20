@@ -3,8 +3,10 @@ import json
 import pytest
 import pandas as pd
 import yaml
-from src.data_utils import load_config, read_files_from_dir,read_data_from_bronze_dir
-from src.path_utils import get_latest_folder, get_last_file_path
+from pathlib import Path
+
+from src.data_utils import load_config, read_files_from_dir, read_data_from_bronze_dir, skip_write, write
+from src.path_utils import get_latest_folder, get_last_file_path, resolve_partition, prepare_output_dir
 
 
 class TestUtils:
@@ -176,3 +178,44 @@ class TestUtils:
         assert row1["year_of_release"] == 2008
         assert row1["domestic_box_office_usd"] == 533345358
         assert row1["international_box_office_usd"] == 469700000
+
+    def test_resolve_partition(self, tmp_path):
+        bronze_root = tmp_path / "bronze" / "provider1" / "year=2025" / "month=11" / "day=17"
+        bronze_root.mkdir(parents=True)
+        config = {
+            "bronze_path": str(tmp_path / "bronze"),
+            "silver_path": str(tmp_path / "silver"),
+            "providers": {"provider1": {"subpath": "provider1"}}
+        }
+        rel = resolve_partition(config, "provider1")
+        assert rel == "year=2025/month=11/day=17"
+
+
+    def test_prepare_output_dir(self, tmp_path):
+        config = {
+            "silver_path": str(tmp_path / "silver")
+        }
+        relative_path = "year=2025/month=11/day=17"
+        out_dir, out_path = prepare_output_dir(config, "provider1", relative_path, "data_clean", "csv")
+        assert out_dir == Path(config["silver_path"]) / "provider1" / "year=2025" / "month=11" / "day=17"
+        assert out_path.name == "data_clean.csv"
+
+
+    def test_skip_write(self, tmp_path):
+        file_path = tmp_path / "test.csv"
+        file_path.write_text("example,data")
+        assert skip_write(file_path, overwrite_flag=False) is True
+        assert skip_write(file_path, overwrite_flag=True) is False
+
+
+    def test_write(self, tmp_path):
+        silver_root = tmp_path / "silver"
+        silver_root.mkdir()
+        config = {"silver_path": str(silver_root)}
+        df = pd.DataFrame({"movie_title": ["Inception"], "release_year": [2010]})
+        rel = "year=2025/month=11/day=17"
+        out_path = write(df, config, "provider1", "csv", "data_clean", rel)
+        assert Path(out_path).exists()
+        written_df = pd.read_csv(out_path)
+        assert len(written_df) == 1
+        assert set(written_df.columns) == {"movie_title", "release_year"}

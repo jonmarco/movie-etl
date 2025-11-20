@@ -5,7 +5,8 @@ import pandas as pd
 
 from pathlib import Path
 from src.data_utils import write_dataset
-from src.path_utils import get_last_file_path
+from src.path_utils import resolve_partition, prepare_output_dir
+from src.data_utils import write, skip_write
 
 class Transform:
 
@@ -80,7 +81,6 @@ class Transform:
         df = self.apply_config_casts(df)
         return df
 
-
     def transform_and_write_to_silver(
         self,
         extracted_data: Dict[str, pd.DataFrame],
@@ -90,9 +90,9 @@ class Transform:
         Transforms extracted Bronze DataFrames (rename + cast) and writes them to the Silver layer.
 
         For each provider:
-          - Retrieves the latest partition from Bronze (using get_last_file_path)
-          - Applies renaming and type casting based on config.yaml
-          - Writes the resulting DataFrame to the Silver layer, mirroring the same date partition
+        - Retrieves the latest partition from Bronze (using get_last_file_path)
+        - Applies renaming and type casting based on config.yaml
+        - Writes the resulting DataFrame to the Silver layer, mirroring the same date partition
 
         Returns
         -------
@@ -103,12 +103,10 @@ class Transform:
 
         overwrite_flag = str(self.config.get("overwrite_silver", "false")).lower() in ("true", "1", "yes")
 
-
         for provider, df in extracted_data.items():
             logging.info(f"Processing provider: {provider}")
 
-            base_path = os.path.join(self.config["bronze_path"], self.config["providers"][provider]["subpath"])
-            relative_partition_path = get_last_file_path(base_path)
+            relative_partition_path = resolve_partition(self.config, provider)
             if not relative_partition_path:
                 logging.warning(f"No Bronze partitions found for provider '{provider}', skipping.")
                 continue
@@ -116,32 +114,17 @@ class Transform:
             df_out = self._transform_provider_df(provider, df)
 
             fmt = self.config.get("silver_data_format", "csv").lower()
-            ext = ".parquet" if fmt == "parquet" else ".csv"
+            _, out_path = prepare_output_dir(self.config, provider, relative_partition_path, filename, fmt)
 
-            silver_base = Path(self.config["silver_path"])
-            rel_parts = relative_partition_path.split("/")
-            out_dir = silver_base.joinpath(provider,*rel_parts)
-            out_dir.mkdir(parents=True, exist_ok=True)
-
-            out_path = out_dir / f"{filename}{ext}"
-
-            if os.path.exists(out_path) and not overwrite_flag:
+            if skip_write(out_path, overwrite_flag):
                 logging.info(f"[SKIP] Silver file already exists for provider '{provider}': {out_path}")
                 written_paths[provider] = out_path
                 continue
 
             try:
-                out_path = write_dataset(
-                    df=df_out,
-                    config=self.config,
-                    layer="silver",
-                    provider=provider,
-                    fmt=fmt,
-                    filename=filename,
-                    relative_partition_path=relative_partition_path,
-                )
-                written_paths[provider] = out_path
-                logging.info(f"Wrote Silver data for {provider}: {out_path}")
+                result_path = write(df_out, self.config, provider, fmt, filename, relative_partition_path)
+                written_paths[provider] = result_path
+                logging.info(f"Wrote Silver data for {provider}: {result_path}")
             except Exception as e:
                 logging.error(f"Failed to write Silver data for {provider}: {e}")
 
