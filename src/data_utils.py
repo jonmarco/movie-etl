@@ -193,3 +193,17 @@ def merge_dataframes(
         df_all = df_all.groupby(merge_keys, as_index=False).first()
 
     return df_all
+
+def skip_write(out_path, overwrite_flag: bool) -> bool:
+    return os.path.exists(out_path) and not overwrite_flag
+
+def write(df: pd.DataFrame, config: Dict, provider: str, fmt: str, filename: str, relative_partition_path: str) -> str:
+    return write_dataset(
+        df=df,
+        config=config,
+        layer="silver",
+        provider=provider,
+        fmt=fmt,
+        filename=filename,
+        relative_partition_path=relative_partition_path,
+    )
